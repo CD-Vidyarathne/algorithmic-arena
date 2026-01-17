@@ -1,0 +1,147 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+out/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Compiled binaries
+AlgorithmicArena
+*.exe
+*.out
+*.app
+
+# Object files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Profiling and analysis output
+perf.data
+perf.data.old
+*.massif
+callgrind.out.*
+gmon.out
+*.gcda
+*.gcno
+*.gcov
+
+# Benchmark and log files
+*.csv
+*.log
+benchmark_results/
+logs/
+
+# IDE specific files
+# VS Code
+.vscode/
+*.code-workspace
+
+# CLion
+.idea/
+cmake-build-*/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# Qt Creator
+*.pro.user
+*.autosave
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Documentation build artifacts
+docs/html/
+docs/latex/
+docs/_build/
+*.aux
+*.toc
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Package managers (if using conan or vcpkg)
+conan.lock
+conanbuildinfo.*
+conaninfo.txt
+graph_info.json
+vcpkg_installed/
+
+# Compiled test assets (if generated)
+assets/compiled/
+
+# Core dumps
+core
+core.*
+*.core
+
+# Valgrind output
+valgrind-*.xml
+massif.out.*
+
+# GDB history
+.gdb_history
+
+# Clang tools
+compile_commands.json
+.clangd/
+.cache/
+
+# Address sanitizer
+*.asan
+
+# Generated documentation
+doxygen_output/
