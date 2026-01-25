@@ -11,5 +11,5 @@ private:
   void processEvents();
   void render();
 
-  sf::RenderWindow m_window;
+  sf::RenderWindow window_;
 };

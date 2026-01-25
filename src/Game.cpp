@@ -4,27 +4,27 @@
 #include <SFML/System/Vector2.hpp>
 
 Game::Game()
-    : m_window(sf::VideoMode(sf::Vector2u(1280, 720)), "Algorithmic Arena") {
+    : window_(sf::VideoMode(sf::Vector2u(1280, 720)), "Algorithmic Arena") {
   Logger::get()->info("Game initialized");
 }
 
 void Game::run() {
-  while (m_window.isOpen()) {
+  while (window_.isOpen()) {
     processEvents();
     render();
   }
 }
 
 void Game::processEvents() {
-  while (const auto event = m_window.pollEvent()) {
+  while (const auto event = window_.pollEvent()) {
     if (event->is<sf::Event::Closed>()) {
       Logger::get()->warn("Window closing event detected");
-      m_window.close();
+      window_.close();
     }
   }
 }
 
 void Game::render() {
-  m_window.clear(sf::Color::White);
-  m_window.display();
+  window_.clear(sf::Color::White);
+  window_.display();
 }
