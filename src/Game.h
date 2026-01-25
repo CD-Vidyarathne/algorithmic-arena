@@ -3,13 +3,13 @@
 #include <SFML/Graphics.hpp>
 
 class Game {
-public:
-  Game();
-  void run();
+  public:
+    Game();
+    void run();
 
-private:
-  void processEvents();
-  void render();
+  private:
+    void processEvents();
+    void render();
 
-  sf::RenderWindow window_;
+    sf::RenderWindow window_;
 };

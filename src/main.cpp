@@ -3,10 +3,10 @@
 
 int main() {
 
-  spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%^%l%$] %v");
+    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%^%l%$] %v");
 
-  Game game;
-  game.run();
+    Game game;
+    game.run();
 
-  return 0;
+    return 0;
 }
