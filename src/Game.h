@@ -1,5 +1,6 @@
 #pragma once
 
+#include "World/TileMap.h"
 #include <SFML/Graphics.hpp>
 
 class Game {
@@ -9,7 +10,12 @@ class Game {
 
   private:
     void processEvents();
+    void update(float dt);
     void render();
 
+    void initializeTileMap();
+
     sf::RenderWindow window_;
+    std::unique_ptr<TileMap> tileMap_;
+    sf::Clock clock_;
 };

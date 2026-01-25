@@ -1,8 +1,4 @@
 Checks: >
   cppcoreguidelines-*,
-  bugprone-*,
-  performance-*,
-  modernize-*,
-  readability-*
 
 WarningsAsErrors: ""

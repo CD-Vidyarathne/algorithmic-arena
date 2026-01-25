@@ -26,9 +26,14 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SFML REQUIRED sfml-system sfml-window sfml-graphics)
 
-set(SOURCES
-    src/main.cpp
-    src/Game.cpp
+file(GLOB_RECURSE SOURCES
+    "src/*.cpp"
+    "src/World/*.cpp"
+    "src/Entities/*.cpp"
+    "src/Algorithms/Collision/*.cpp"
+    "src/Algorithms/Pathfinding/*.cpp"
+    "src/Core/*.cpp"
+    "src/UI/*.cpp"
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
