@@ -30,7 +30,6 @@ bool TileMap::isWalkable(unsigned int x, unsigned int y) const {
 
 void TileMap::draw(sf::RenderWindow &window) {
     window.draw(vertices_);
-    Logger::get()->info("Tilemap drawn");
 }
 
 void TileMap::updateVertices() {

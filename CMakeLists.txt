@@ -38,7 +38,9 @@ file(GLOB_RECURSE SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} ${SFML_LIBRARIES})
+find_package(spdlog REQUIRED)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ${SFML_LIBRARIES} spdlog::spdlog)
 target_include_directories(${PROJECT_NAME} PRIVATE ${SFML_INCLUDE_DIRS})
 target_compile_options(${PROJECT_NAME} PRIVATE ${SFML_CFLAGS_OTHER})
 
