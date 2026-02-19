@@ -15,7 +15,9 @@ Game::Game()
 
 void Game::run() {
     while (window_.isOpen()) {
+        float dt = clock_.restart().asSeconds();
         processEvents();
+        update(dt);
         render();
     }
 }
@@ -30,6 +32,7 @@ void Game::processEvents() {
 }
 
 void Game::update(float dt) {
+    entityManager_.updateAll(dt);
 }
 
 void Game::render() {
@@ -39,6 +42,7 @@ void Game::render() {
         tileMap_->draw(window_);
     }
 
+    entityManager_.renderAll(window_);
     window_.display();
 }
 

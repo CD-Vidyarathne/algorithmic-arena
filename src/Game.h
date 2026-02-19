@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Entities/EntityManager.h"
 #include "World/TileMap.h"
 #include <SFML/Graphics.hpp>
 
@@ -18,4 +19,5 @@ class Game {
     sf::RenderWindow window_;
     std::unique_ptr<TileMap> tileMap_;
     sf::Clock clock_;
+    EntityManager entityManager_;
 };
