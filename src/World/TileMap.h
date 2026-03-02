@@ -11,6 +11,7 @@ class TileMap {
     void setTile(unsigned int x, unsigned int y, TileType type);
     TileType getTile(unsigned int x, unsigned int y) const;
     bool isWalkable(unsigned int x, unsigned int y) const;
+    void updateTileVertices(unsigned int x, unsigned int y);
 
     void draw(sf::RenderWindow &window);
 
@@ -22,6 +23,19 @@ class TileMap {
     }
     unsigned int getTileSize() const {
         return tileSize_;
+    }
+
+    sf::Vector2i worldToTile(sf::Vector2f worldPos) const {
+        return {static_cast<int>(worldPos.x / tileSize_), static_cast<int>(worldPos.y / tileSize_)};
+    }
+    sf::Vector2f tileToWorld(sf::Vector2i tilePos) const {
+        return {static_cast<float>(tilePos.x * tileSize_),
+                static_cast<float>(tilePos.y * tileSize_)};
+    }
+    sf::Vector2f tileCentre(sf::Vector2i tilePos) const {
+        float half = tileSize_ / 2.f;
+        return {static_cast<float>(tilePos.x * tileSize_) + half,
+                static_cast<float>(tilePos.y * tileSize_) + half};
     }
 
   private:

@@ -33,6 +33,7 @@ void Game::processEvents() {
 
 void Game::update(float dt) {
     entityManager_.updateAll(dt);
+    entityManager_.removeDeadEntities();
 }
 
 void Game::render() {

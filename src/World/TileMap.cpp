@@ -12,7 +12,7 @@ TileMap::TileMap(unsigned int width, unsigned int height, unsigned int tileSize)
 void TileMap::setTile(unsigned int x, unsigned int y, TileType type) {
     if (x < width_ && y < height_) {
         tiles_[y * width_ + x] = type;
-        updateVertices();
+        updateTileVertices(x, y);
     }
 }
 
@@ -41,8 +41,8 @@ void TileMap::updateVertices() {
             TileType type = tiles_[tileIndex];
             sf::Color color = getTileColor(type);
 
-            float posX = x * tileSize_;
-            float posY = y * tileSize_;
+            float posX = static_cast<float>(x * tileSize_);
+            float posY = static_cast<float>(y * tileSize_);
             sf::Vector2f topLeft(posX, posY);
             sf::Vector2f topRight(posX + tileSize_, posY);
             sf::Vector2f bottomRight(posX + tileSize_, posY + tileSize_);
@@ -60,6 +60,28 @@ void TileMap::updateVertices() {
                 vertices_[vertexIndex + i].color = color;
             }
         }
+    }
+}
+
+void TileMap::updateTileVertices(unsigned int x, unsigned int y) {
+    unsigned int tileIndex = y * width_ + x;
+    unsigned int vertexIndex = tileIndex * 6;
+    sf::Color color = getTileColor(tiles_[tileIndex]);
+    float posX = static_cast<float>(x * tileSize_);
+    float posY = static_cast<float>(y * tileSize_);
+    sf::Vector2f topLeft(posX, posY);
+    sf::Vector2f topRight(posX + tileSize_, posY);
+    sf::Vector2f bottomRight(posX + tileSize_, posY + tileSize_);
+    sf::Vector2f bottomLeft(posX, posY + tileSize_);
+
+    vertices_[vertexIndex + 0].position = topLeft;
+    vertices_[vertexIndex + 1].position = bottomLeft;
+    vertices_[vertexIndex + 2].position = topRight;
+    vertices_[vertexIndex + 3].position = bottomLeft;
+    vertices_[vertexIndex + 4].position = bottomRight;
+    vertices_[vertexIndex + 5].position = topRight;
+    for (int i = 0; i < 6; ++i) {
+        vertices_[vertexIndex + i].color = color;
     }
 }
 

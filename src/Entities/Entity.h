@@ -7,8 +7,11 @@
 class Entity {
   public:
     explicit Entity(sf::Vector2f position, sf::Vector2f size, sf::Color color)
-        : position_(position), velocity_({0.f, 0.f}), size_(size), color_(color) {
+        : position_(position), velocity_({0.f, 0.f}), size_(size), color_(color), alive_(true) {
     }
+
+    Entity(const Entity &) = delete;
+    Entity &operator=(const Entity &) = delete;
 
     virtual ~Entity() = default;
 
@@ -28,6 +31,9 @@ class Entity {
     sf::Vector2f getSize() const {
         return size_;
     }
+    sf::Color getColor() const {
+        return color_;
+    }
 
     void setPosition(sf::Vector2f position) {
         position_ = position;
@@ -36,9 +42,18 @@ class Entity {
         velocity_ = velocity;
     }
 
+    bool isAlive() const {
+        return alive_;
+    }
+
+    void destroy() {
+        alive_ = false;
+    }
+
   private:
     sf::Vector2f position_;
     sf::Vector2f velocity_;
     sf::Vector2f size_;
     sf::Color color_;
+    bool alive_ = true;
 };
