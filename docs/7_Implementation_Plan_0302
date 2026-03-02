@@ -565,3 +565,442 @@ The order below is driven by: (a) unblock the next step, (b) minimize rework, (c
 4. **No `dt` in collision or pathfinding interfaces.** Collision resolves current state; pathfinding is stateless per call.
 5. **Coordinate system:** all world positions in pixels (`float`); all tile positions in tile indices (`int`). Always use `TileMap::worldToTile` / `tileCentre` to convert. Never inline the multiplication.
 6. **Debug state lives in `Game`.** No debug flags in entity or algorithm classes.
+
+---
+
+## 9. Tile System Overhaul: 5-Type Textured Map with Map File Format
+
+This section replaces the current 2-type (`Walkable`/`Blocked`) hardcoded TileMap with a full 5-type textured tile system loaded from plain-text map files. It also mandates the camera and deployment zone logic.
+
+---
+
+### 9a. Tile Type Redesign
+
+**Current state:** `enum class TileType { Walkable, Blocked }` — two types, solid colour rendering, no textures.
+
+**New design:** 5 tile types with distinct gameplay properties:
+
+| Symbol | TileType enum | Passable | Speed Modifier | Role |
+|--------|--------------|----------|----------------|------|
+| `G` | `Grass` | Yes | 1.0× | Normal walkable ground; default open area |
+| `M` | `Mud` | Yes | 0.6× | Slow terrain; pathfinding cost = ~1.67 vs 1.0 for Grass |
+| `T` | `Tree` | No | — | Impassable; defines maze walls |
+| `L` | `Lava` | No | — | Impassable blocker; can be used at maze boundaries or as hazard |
+| `F` | `Flag` | Yes | 1.0× | Capture objective; replaces NexusCore entity (see note below) |
+
+**Note on Flag/NexusCore:** The Flag tile is a *capturable tile* not an entity. This is a design shift from the original NexusCore entity approach. Flag tiles are part of the TileMap and have per-tile capture state (`float captureProgress[tileIndex]`). This avoids the overhead of entities that never move and simplifies collision (no entity-vs-nexus AABB needed). The `NexusCore` entity class from Section 1c is **dropped**; capture logic operates directly on TileMap flag tiles.
+
+**Pathfinding cost table** (used by `IPathfindingSystem`):
+- `Grass` → cost 10
+- `Mud` → cost 17 (≈ 10 / 0.6)
+- `Tree`, `Lava` → impassable (skip in neighbour expansion)
+- `Flag` → cost 10 (same as Grass)
+
+Using integer costs (×10) avoids floating-point accumulation in Dijkstra/A*.
+
+**Update `TileMap.h`:**
+```cpp
+enum class TileType { Grass, Mud, Tree, Lava, Flag };
+
+// Replaces old isWalkable — returns false for Tree and Lava
+bool isPassable(unsigned int x, unsigned int y) const;
+
+// Movement cost for pathfinding (returns INT_MAX for impassable)
+int movementCost(unsigned int x, unsigned int y) const;
+
+// Capture state for Flag tiles (indexed by tileIndex; ignored for non-Flag tiles)
+float getCaptureProgress(unsigned int x, unsigned int y) const;
+void advanceCapture(unsigned int x, unsigned int y, float dt, float rate);
+bool isCaptured(unsigned int x, unsigned int y) const;
+```
+
+Replace the old `isWalkable` call sites in collision systems with `isPassable`. Replace the old NexusCore entity logic with TileMap capture queries.
+
+---
+
+### 9b. Asset Management: `TextureManager`
+
+All tile sprites are 256×256 source images (except `grass_tl.png` which is 64×64 — treat as anomaly; scale uniformly to `tileSize_` on load). Flag is 1280×1280; Tree is 64×64. All will be scaled to `tileSize_` via `sf::Sprite::setScale`.
+
+The directional variants (tl, tr, bl, br, horizontal, vertical, intersection, tjunction) are **border transition tiles** — they represent the edge of one terrain type where it meets a different neighbour. This is an **auto-tiling** system.
+
+**File:** `src/World/TextureManager.h/.cpp`
+
+```cpp
+class TextureManager {
+  public:
+    // Load all tile textures from assets/Tiles/
+    bool loadAll(const std::string& assetsRoot);
+
+    // Returns the correct texture for a tile type + its 4-neighbour context
+    // neighbourMask: bit 0=N, bit 1=E, bit 2=S, bit 3=W (1 = same type, 0 = different)
+    const sf::Texture& getTileTexture(TileType type, uint8_t neighbourMask) const;
+
+    const sf::Texture& getFlagTexture() const;
+    const sf::Texture& getTreeTexture() const;
+
+  private:
+    // Indexed by TileType (Grass/Mud/Lava) then by variant
+    std::unordered_map<std::string, sf::Texture> textures_;
+};
+```
+
+**Auto-tiling variant selection** (for Grass, Mud, Lava which have directional assets):
+
+The 4-bit neighbour mask (N/E/S/W same-type neighbours) maps to variants:
+
+| Mask (N E S W) | Variant | Meaning |
+|---|---|---|
+| `0000` | `_tl` (or full tile — use tl as standalone) | Isolated tile |
+| `0010` (S only) | `_tl` | Top-left cap |
+| `0001` (W only) | `_tr` | Top-right cap |
+| `0110` (E+S) | `_tl` | Corner |
+| `1001` (N+W) | `_br` | Corner |
+| `0101` (E+W) | `_horizontal` | Horizontal corridor |
+| `1010` (N+S) | `_vertical` | Vertical corridor |
+| `1110` (N+E+S) | `_tjunction` | T-junction |
+| `1111` (all) | `_intersection` | Full cross |
+| … | … | … |
+
+> **Simplification option:** Auto-tiling is visually important but non-trivial to get perfect. For initial implementation, use a single representative texture per type (e.g. `grass_tl.png` for all Grass tiles) and add full auto-tiling as a polish pass. Mark this as a TODO in the code with a `// TODO: auto-tile` comment.
+
+**Tree and Flag** have single sprites — no auto-tiling needed.
+
+---
+
+### 9c. TileMap Rendering: Textured VertexArray with TextureAtlas or Per-Tile Sprites
+
+**Option A (recommended): Per-tile `sf::Sprite` batch via `sf::RenderStates`**
+
+For a 512×512 map, drawing 262,144 individual `sf::Sprite` objects per frame is too slow. Instead, build a `sf::VertexArray` per texture (one draw call per distinct texture variant used):
+
+```cpp
+// In TileMap, instead of a single VertexArray with colours,
+// maintain one VertexArray per TileType variant (up to ~20 entries):
+std::unordered_map<std::string, sf::VertexArray> variantVertices_;
+// key = "grass_tl", "mud_horizontal", etc.
+
+void draw(sf::RenderWindow& window, const TextureManager& textures);
+// Iterates variantVertices_, calls window.draw(va, sf::RenderStates(&texture))
+```
+
+This keeps draw calls to ~20 max regardless of map size.
+
+**Dirty flag for partial updates:** Since `setTile` now calls `updateTileVertices(x, y)` (from fix 0a), it must also rebuild the correct entry in `variantVertices_`. Add `markDirty(unsigned int x, unsigned int y)` and rebuild only affected entries on next `draw()` call.
+
+**Option B (simpler fallback):** Keep the existing single VertexArray with solid colours per type for algorithm correctness, add sprite rendering as a separate visual layer. This is acceptable for the submission given time constraints.
+
+**Decision for plan:** Implement Option B first (colours only, fast), then add Option A textured rendering once the gameplay loop is stable. The map file format and tile type system are independent of which rendering option is active.
+
+---
+
+### 9d. Map File Format
+
+**Location:** `maps/` directory in project root.
+
+**Format:** Plain text, `.map` extension. Each line is one row of the map. Each character is one tile symbol. Whitespace and `#`-prefixed lines are comments/metadata.
+
+**Symbol table:**
+
+| Symbol | Tile |
+|--------|------|
+| `G` | Grass |
+| `M` | Mud |
+| `T` | Tree (maze wall) |
+| `L` | Lava |
+| `F` | Flag (capture point) |
+| `D` | Deployment zone (Grass tile tagged as valid Minion spawn) |
+| `C` | Commander start position (Grass tile + commander spawn marker) |
+| `E` | Entrance tile (Grass at the boundary between deploy zone and maze interior) |
+
+`D`, `C`, `E` are **metadata overlays** — the underlying tile is Grass; they additionally set flags in a parallel `uint8_t flags_[]` array in TileMap.
+
+**Example map header block** (lines starting with `#`):
+```
+# name=Nexus Siege
+# width=512
+# height=512
+# tile_size=32
+# time_limit=180
+# minion_cap=200
+```
+
+**Example map fragment (top-left corner):**
+```
+TTTTTTTTTTTTTTTTTTT...
+TDDDDDDDDDDDDDDDDDDT...
+TDDDDDDDDDDDDDDDDDDT...
+TDDCEEEEEEGGGGGDDDT...
+TGGGGGGGGGGGGGGGGGGT...
+TGGMMMMMMMGGGGGGGGT...
+TGGMTTTTTMGGGGGGGGT...
+...
+```
+
+**Parser:** `src/World/MapLoader.h/.cpp`
+
+```cpp
+struct MapData {
+    unsigned int width;
+    unsigned int height;
+    unsigned int tileSize;
+    std::string name;
+    int timeLimitSeconds;
+    int minionCap;
+    std::vector<TileType> tiles;
+    std::vector<uint8_t> flags;       // bitmask: FLAG_DEPLOY=1, FLAG_ENTRANCE=2, FLAG_COMMANDER_START=4
+    std::vector<sf::Vector2i> flagTiles;      // positions of all Flag tiles
+    std::vector<sf::Vector2i> deployZone;     // positions of all Deploy tiles
+    sf::Vector2i commanderStart;
+};
+
+class MapLoader {
+  public:
+    static MapData load(const std::string& path);
+};
+```
+
+**Validation rules enforced at load time:**
+1. Width and height must be declared and match the actual character grid dimensions.
+2. Unknown symbols → `Grass` with a warning logged via `Logger`.
+3. Exactly one `C` tile required (commander start); log error if missing or multiple.
+4. At least one `F` tile required (capture objective).
+5. `D` tiles must only appear at the map border band (outer N rows/columns as defined by `deployBorderWidth`, default 3). Log a warning if a `D` tile is found in the interior.
+
+---
+
+### 9e. Map Layout Rules and Gameplay Zones
+
+The map has three logical zones:
+
+```
++--------------------------------------------------+
+|  TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT |
+|  T  DEPLOYMENT ZONE  (D tiles, Grass)           T |
+|  T  Commander spawns here; Minions deploy here  T |
+|  TEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEET |  <- Entrance row
+|  T                                              T |
+|  T         MAZE INTERIOR                       T |
+|  T   Trees form walls; Lava = hazard blocker   T |
+|  T   Mud patches = slow terrain                T |
+|  T   Flag tiles = capture objectives           T |
+|  T                                              T |
+|  TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT |
++--------------------------------------------------+
+```
+
+**Rules:**
+- Deployment zone: outer band (configurable depth, default 3 tiles) of `D`-flagged Grass tiles. Commander starts here. Minions can only be spawned on `D` tiles (enforce in `Game::spawnMinion()`).
+- Entrance tiles (`E`): Grass tiles at the inner edge of the deployment zone that are adjacent to the maze interior. There must be at least 2 entrances so Minions can enter the maze. Pathfinding routes all go through these.
+- Maze interior: everything inside the entrance row. Tree tiles form walls; the pathfinder routes through Grass/Mud/Flag only.
+- Commander movement: Commander can move freely through D tiles and E tiles. Whether Commander can enter the maze is a gameplay choice — **for this project, allow it** (lets the player scout). Commander should not be able to pass through Tree or Lava.
+- Minion spawning: only on `D`-flagged tiles. Check `tileMap_->hasFlag(x, y, FLAG_DEPLOY)` before spawning.
+
+**Enforce in `Game::spawnMinion()`:**
+```cpp
+void Game::spawnMinion() {
+    if (minions_.size() >= maxMinions_) return;
+    // Find a random deploy tile near commander
+    sf::Vector2i cmdTile = tileMap_->worldToTile(commander_->getPosition());
+    // Search nearby D-flagged tiles within radius 3
+    // ... pick closest available
+    auto minion = std::make_unique<Minion>(spawnPos, pathfindingSystem_.get(), tileMap_.get());
+    minions_.push_back(minion.get());
+    entityManager_.addEntity(std::move(minion));
+}
+```
+
+---
+
+### 9f. Map Scale: 512×512 Tiles and Camera
+
+A 512×512 tile map at 32px/tile = **16,384×16,384 pixel world**. The window is 1280×720. A camera (`sf::View`) is mandatory.
+
+**Camera design:**
+- `sf::View gameView_` member in `Game`, sized to window (1280×720).
+- Each frame in `update(dt)`: centre the view on the Commander's world position, clamped so the view never shows outside the map bounds:
+```cpp
+sf::Vector2f centre = commander_->getPosition();
+float halfW = gameView_.getSize().x / 2.f;
+float halfH = gameView_.getSize().y / 2.f;
+float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
+float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
+centre.x = std::clamp(centre.x, halfW, mapW - halfW);
+centre.y = std::clamp(centre.y, halfH, mapH - halfH);
+gameView_.setCenter(centre);
+```
+- In `render()`: apply `window_.setView(gameView_)` before drawing TileMap and entities; apply `window_.setView(window_.getDefaultView())` before drawing DebugOverlay (HUD stays in screen space).
+- Mouse-to-world conversion for click orders: `window_.mapPixelToCoords(sf::Mouse::getPosition(window_), gameView_)`.
+
+**TileMap rendering optimisation for large maps:** Drawing all 262,144 tiles every frame is wasteful. Add **view frustum culling** to `TileMap::draw()`:
+
+```cpp
+void TileMap::draw(sf::RenderWindow& window) {
+    // Compute visible tile range from current view
+    sf::FloatRect viewBounds = /* window.getView().getViewport mapped to world */;
+    unsigned int xMin = std::max(0u, (unsigned int)(viewBounds.position.x / tileSize_));
+    unsigned int yMin = std::max(0u, (unsigned int)(viewBounds.position.y / tileSize_));
+    unsigned int xMax = std::min(width_,  (unsigned int)((viewBounds.position.x + viewBounds.size.x) / tileSize_) + 1);
+    unsigned int yMax = std::min(height_, (unsigned int)((viewBounds.position.y + viewBounds.size.y) / tileSize_) + 1);
+    // Only draw tiles in [xMin,xMax) x [yMin,yMax)
+}
+```
+
+At 1280×720 with 32px tiles, the visible area is at most 41×23 = ~943 tiles out of 262,144. This is the difference between a smooth 60fps and unplayable slideshow.
+
+With the VertexArray approach: rebuild a temporary `sf::VertexArray` each frame for visible tiles only (943 × 6 = ~5,658 vertices — trivially fast).
+
+---
+
+### 9g. Provided Map Files
+
+Create the following map files in `maps/`:
+
+**`maps/nexus_siege_512.map`** — primary gameplay and benchmark map:
+- 512×512 tiles
+- Outer 3-tile border: `T` (Tree)
+- Deploy band: rows 1–3 and cols 1–3 (and mirrored bottom/right): `D` tiles
+- Entrances: multiple `E` tiles connecting deploy band to maze at regular intervals
+- Maze interior: procedural-style Tree walls forming corridors (define a pattern in the file — a large grid-of-rooms layout works well)
+- Mud patches scattered in maze corridors (every 3rd corridor section)
+- Lava in dead-end chambers as hazards
+- Flag tiles: 5–8 locations deep inside the maze
+
+**`maps/benchmark_open_512.map`** — open field for stress-testing collision with many entities:
+- 512×512
+- Outer Tree border
+- Deploy band
+- Interior: mostly Grass, a few Lava pillars, no maze
+- 2 Flag tiles
+- Used for: collision benchmark (BruteForce vs Quadtree with 200+ Minions)
+
+**`maps/benchmark_maze_512.map`** — dense maze for pathfinding stress:
+- 512×512
+- Dense Tree maze (thin corridors, many dead ends)
+- Mud throughout (stress-tests weighted pathfinding)
+- 4 Flag tiles at far corners
+- Used for: Dijkstra vs A* comparison
+
+**Note on file size:** A 512×512 `.map` file is 262,144 characters of symbols + newlines = ~780 KB plain text. This is fine to commit. Generate these files with a simple Python script (provide as `scripts/generate_maps.py`) rather than hand-editing, then commit the generated `.map` files.
+
+**`scripts/generate_maps.py`** (to be created):
+```python
+# Generates maps/nexus_siege_512.map, benchmark_open_512.map, benchmark_maze_512.map
+# Run once: python3 scripts/generate_maps.py
+```
+
+The script is provided so maps can be regenerated with different seeds/parameters for varied benchmarks.
+
+---
+
+### 9h. Updated `ScenarioManager` to use MapLoader
+
+Replace the key=value config format from Section 8 with direct `.map` file loading. The scenario IS the map file — all scenario parameters (width, height, tile_size, time_limit, minion_cap) are declared in the map header block.
+
+Updated `ScenarioManager::load`:
+```cpp
+ScenarioConfig ScenarioManager::load(const std::string& mapPath) {
+    MapData data = MapLoader::load(mapPath);
+    ScenarioConfig cfg;
+    cfg.mapData = std::move(data);
+    // cfg fields populated from data.timeLimitSeconds, data.minionCap, etc.
+    return cfg;
+}
+```
+
+Remove the old `.txt` scenario files (they are superseded by `.map` files).
+
+---
+
+### 9i. Updated Pathfinding for Weighted Tiles
+
+The pathfinding interfaces from Section 3 do not need to change. What changes is the cost lookup inside `DijkstrasPathfindingSystem` and `AStarPathfindingSystem`:
+
+Replace fixed cost `1` per step with `tileMap.movementCost(nx, ny)`:
+
+```cpp
+// In neighbour expansion loop:
+int cost = map.movementCost(nx, ny);
+if (cost == INT_MAX) continue;  // impassable
+int newG = current.gCost + cost;
+```
+
+This means Mud tiles are automatically 1.67× more expensive, so pathfinders naturally route around Mud when a Grass alternative exists. This is a **significant benchmark differentiator** between Dijkstra and A* — A* will avoid Mud more efficiently due to its heuristic guidance.
+
+---
+
+### 9j. Updated `TileMap.h/.cpp` — full change summary
+
+The existing `TileMap` needs these changes (cumulative with fixes 0a–0d):
+
+1. `enum class TileType` → 5 values (Grass, Mud, Tree, Lava, Flag)
+2. `isWalkable` → renamed `isPassable` (returns false for Tree/Lava)
+3. Add `movementCost(x, y)` → returns int cost (10/17/INT_MAX)
+4. Add `flags_` parallel array (`std::vector<uint8_t>`) for deploy/entrance/commander-start metadata
+5. Add `hasFlag(x, y, flagBit)` / `setFlag(x, y, flagBit)` accessors
+6. Add `captureProgress_` array (`std::vector<float>`) for Flag tiles
+7. Add `advanceCapture(x, y, dt, rate)`, `getCaptureProgress(x, y)`, `isCaptured(x, y)`
+8. `getTileColor` updated for 5 types (for fallback colour rendering):
+   - Grass: `(34, 139, 34)` — keep existing
+   - Mud: `(139, 90, 43)` — brown
+   - Tree: `(34, 80, 34)` — dark green
+   - Lava: `(200, 60, 10)` — orange-red
+   - Flag: `(200, 200, 50)` — gold
+9. `draw(window)` updated with frustum culling (Section 9f)
+10. `setTile` uses single-tile vertex update (fix 0a) and now also updates `captureProgress_` default (0.0 for non-Flag tiles)
+
+---
+
+### 9k. Updated Implementation Order (incorporating Section 9)
+
+Insert map system work between step 1 (entities) and step 2 (collision) in the Revised Implementation Order:
+
+**Revised full order:**
+
+1. Pre-condition fixes (0a–0d) — ~2h
+2. **Map system: `TileType` enum expansion + `TileMap` updates (9j) + `MapLoader` (9d) + generate_maps.py + first `.map` file** — ~4–5h. This gives a real 512×512 world to work in for all subsequent steps.
+3. **Camera (`sf::View`) + frustum culling** (9f) — ~2h. Required to navigate the large map.
+4. Algorithm system construction in Game + `initializeEntities()` — ~1h
+5. `ICollisionSystem` + `BruteForceCollisionSystem` + Game integration — ~3–4h
+6. `QuadtreeCollisionSystem` — ~4–5h. **Report-ready: collision comparison.**
+7. `PlayerCommander` + movement — ~1–2h
+8. `IPathfindingSystem` + `Dijkstra` + `A*` + weighted costs (9i) — ~4–5h
+9. `Minion` AI + pathfinding — ~2–3h. **Report-ready: pathfinding comparison.**
+10. Flag tile capture logic + win/lose (replaces NexusCore entity) — ~2h
+11. Commander deploy-zone enforcement + `spawnMinion()` — ~1h
+12. `TextureManager` + textured rendering (Option A, 9c) — ~4–5h
+13. `Timer` + `DebugOverlay` + font — ~2–3h
+14. CSV logging — ~1h
+15. `ScenarioManager` using MapLoader (9h) — ~1–2h
+16. Debug visualizations (F1–F3) — ~2h
+
+**Total estimate:** ~38–50h. Prioritise steps 1–9 for Mar 15 report (benchmarkable engine with real map); steps 10–16 for Apr 19 final submission.
+
+---
+
+### 9l. File and Directory Changes Summary
+
+New directories and files to create:
+
+```
+maps/
+├── nexus_siege_512.map
+├── benchmark_open_512.map
+└── benchmark_maze_512.map
+
+scripts/
+└── generate_maps.py
+
+src/World/
+├── TileMap.h          (heavily modified)
+├── TileMap.cpp        (heavily modified)
+├── MapLoader.h        (new)
+├── MapLoader.cpp      (new)
+├── TextureManager.h   (new)
+└── TextureManager.cpp (new)
+```
+
+Removed/superseded:
+- `scenarios/` directory (replaced by `maps/`)
+- Hardcoded `initializeTileMap()` body (replaced by `MapLoader::load()`)
+- `NexusCore` entity class (replaced by Flag tile capture state in TileMap)
