@@ -60,6 +60,22 @@ void Game::update(float dt) {
         spawnCooldown_ = 0.f;
     }
 
+    if (commander_ && tileMap_) {
+        sf::Vector2f pos = commander_->getPosition();
+        const float mapW =
+            static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
+        const float mapH =
+            static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
+        const sf::Vector2f size = commander_->getSize();
+
+        const float maxX = std::max(0.f, mapW - size.x);
+        const float maxY = std::max(0.f, mapH - size.y);
+
+        pos.x = std::clamp(pos.x, 0.f, maxX);
+        pos.y = std::clamp(pos.y, 0.f, maxY);
+        commander_->setPosition(pos);
+    }
+
     updateCamera();
 }
 

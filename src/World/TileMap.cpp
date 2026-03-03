@@ -2,6 +2,10 @@
 #include "../Util/Logger.h"
 #include <algorithm>
 
+namespace {
+constexpr uint8_t TILE_FLAG_DEPLOY = 1u << 0;
+} // namespace
+
 TileMap::TileMap(unsigned int width, unsigned int height, unsigned int tileSize)
     : width_(width), height_(height), tileSize_(tileSize), tiles_(width * height, TileType::Grass),
       flags_(width * height, 0u), captureProgress_(width * height, 0.0f),
@@ -74,8 +78,10 @@ void TileMap::draw(sf::RenderWindow &window) {
     const unsigned int visH = static_cast<unsigned int>(yMax - yMin);
     sf::VertexArray visible(sf::PrimitiveType::Triangles, visW * visH * 6);
     std::size_t idx = 0;
-    for (unsigned int ty = static_cast<unsigned int>(yMin); ty < static_cast<unsigned int>(yMax); ++ty) {
-        for (unsigned int tx = static_cast<unsigned int>(xMin); tx < static_cast<unsigned int>(xMax); ++tx) {
+    for (unsigned int ty = static_cast<unsigned int>(yMin);
+         ty < static_cast<unsigned int>(yMax); ++ty) {
+        for (unsigned int tx = static_cast<unsigned int>(xMin);
+             tx < static_cast<unsigned int>(xMax); ++tx) {
             const unsigned int vertexIndex = (ty * width_ + tx) * 6;
             for (int i = 0; i < 6; ++i) {
                 visible[idx++] = vertices_[vertexIndex + i];
@@ -83,6 +89,28 @@ void TileMap::draw(sf::RenderWindow &window) {
         }
     }
     window.draw(visible);
+
+    const sf::Color outlineColor(100, 180, 255);
+    sf::RectangleShape outline(
+        sf::Vector2f(static_cast<float>(tileSize_), static_cast<float>(tileSize_)));
+    outline.setFillColor(sf::Color::Transparent);
+    outline.setOutlineThickness(1.f);
+    outline.setOutlineColor(outlineColor);
+
+    for (unsigned int ty = static_cast<unsigned int>(yMin);
+         ty < static_cast<unsigned int>(yMax); ++ty) {
+        for (unsigned int tx = static_cast<unsigned int>(xMin);
+             tx < static_cast<unsigned int>(xMax); ++tx) {
+            const std::size_t index = static_cast<std::size_t>(ty) * width_ + tx;
+            if ((flags_[index] & TILE_FLAG_DEPLOY) == 0u)
+                continue;
+
+            outline.setPosition(
+                sf::Vector2f(static_cast<float>(tx * tileSize_),
+                             static_cast<float>(ty * tileSize_)));
+            window.draw(outline);
+        }
+    }
 }
 
 bool TileMap::hasFlag(unsigned int x, unsigned int y, uint8_t bit) const {
@@ -140,6 +168,14 @@ void TileMap::updateTileVertices(unsigned int x, unsigned int y) {
     unsigned int tileIndex = y * width_ + x;
     unsigned int vertexIndex = tileIndex * 6;
     sf::Color color = getTileColor(tiles_[tileIndex]);
+    if ((flags_[tileIndex] & TILE_FLAG_DEPLOY) != 0u) {
+        const int r = std::min(255, static_cast<int>(color.r) + 10);
+        const int g = std::min(255, static_cast<int>(color.g) + 20);
+        const int b = std::min(255, static_cast<int>(color.b) + 60);
+        color.r = static_cast<decltype(color.r)>(r);
+        color.g = static_cast<decltype(color.g)>(g);
+        color.b = static_cast<decltype(color.b)>(b);
+    }
     float posX = static_cast<float>(x * tileSize_);
     float posY = static_cast<float>(y * tileSize_);
     sf::Vector2f topLeft(posX, posY);
