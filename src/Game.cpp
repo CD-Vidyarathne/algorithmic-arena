@@ -48,19 +48,20 @@ void Game::render() {
 }
 
 void Game::initializeTileMap() {
-    tileMap_ = std::make_unique<TileMap>(40, 22, 32);
+    auto data = MapLoader::load("../maps/benchmark_maze_512.map");
 
-    for (unsigned int x = 0; x < tileMap_->getWidth(); ++x) {
-        tileMap_->setTile(x, 0, TileType::Blocked);
-        tileMap_->setTile(x, tileMap_->getHeight() - 1, TileType::Blocked);
-    }
+    tileMap_ = std::make_unique<TileMap>(data.width, data.height, data.tileSize);
 
-    for (unsigned int y = 0; y < tileMap_->getHeight(); ++y) {
-        tileMap_->setTile(0, y, TileType::Blocked);
-        tileMap_->setTile(tileMap_->getWidth() - 1, y, TileType::Blocked);
-    }
-
-    for (unsigned int x = 10; x < 15; ++x) {
-        tileMap_->setTile(x, 10, TileType::Blocked);
+    for (unsigned int y = 0; y < data.height; ++y) {
+        for (unsigned int x = 0; x < data.width; ++x) {
+            std::size_t i = y * data.width + x;
+            tileMap_->setTile(x, y, data.tiles[i]);
+            if (data.flags[i] & FLAG_DEPLOY)
+                tileMap_->setFlag(x, y, FLAG_DEPLOY);
+            if (data.flags[i] & FLAG_ENTRANCE)
+                tileMap_->setFlag(x, y, FLAG_ENTRANCE);
+            if (data.flags[i] & FLAG_COMMANDER_START)
+                tileMap_->setFlag(x, y, FLAG_COMMANDER_START);
+        }
     }
 }

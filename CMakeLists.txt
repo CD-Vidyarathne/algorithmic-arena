@@ -26,17 +26,23 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SFML REQUIRED sfml-system sfml-window sfml-graphics)
 
-file(GLOB_RECURSE SOURCES
-    "src/*.cpp"
-    "src/World/*.cpp"
-    "src/Entities/*.cpp"
-    "src/Algorithms/Collision/*.cpp"
-    "src/Algorithms/Pathfinding/*.cpp"
-    "src/Core/*.cpp"
-    "src/UI/*.cpp"
+# file(GLOB_RECURSE SOURCES
+#     "src/*.cpp"
+#     "src/World/*.cpp"
+#     "src/Entities/*.cpp"
+#     "src/Algorithms/Collision/*.cpp"
+#     "src/Algorithms/Pathfinding/*.cpp"
+#     "src/Core/*.cpp"
+#     "src/UI/*.cpp"
+# )
+add_executable(${PROJECT_NAME}
+    src/main.cpp
+    src/Game.cpp
+    src/World/TileMap.cpp
+    src/World/MapLoader.cpp
 )
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+# add_executable(${PROJECT_NAME} ${SOURCES})
 
 find_package(spdlog REQUIRED)
 

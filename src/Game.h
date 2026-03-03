@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Entities/EntityManager.h"
+#include "World/MapLoader.h"
 #include "World/TileMap.h"
 #include <SFML/Graphics.hpp>
 
