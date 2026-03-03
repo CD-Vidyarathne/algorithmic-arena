@@ -1,9 +1,11 @@
 #include "Game.h"
 #include "Entities/Entity.h"
+#include "Entities/Minion.h"
 #include "Entities/PlayerCommander.h"
 #include "Util/Logger.h"
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/System/Vector2.hpp>
+#include <SFML/Window/Keyboard.hpp>
 #include <algorithm>
 
 const int WINDOW_WIDTH = 1280;
@@ -43,6 +45,21 @@ void Game::processEvents() {
 void Game::update(float dt) {
     entityManager_.updateAll(dt);
     entityManager_.removeDeadEntities();
+
+    minions_.erase(std::remove_if(minions_.begin(), minions_.end(),
+                      [](Minion *m) { return !m->isAlive(); }),
+                   minions_.end());
+
+    if (commander_ && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
+        spawnCooldown_ -= dt;
+        if (spawnCooldown_ <= 0.f) {
+            spawnMinion();
+            spawnCooldown_ = 0.2f;
+        }
+    } else {
+        spawnCooldown_ = 0.f;
+    }
+
     updateCamera();
 }
 
@@ -87,6 +104,9 @@ void Game::render() {
 void Game::initializeTileMap() {
     auto data = MapLoader::load("../maps/benchmark_maze_512.map");
 
+    maxMinions_ = data.minionCap > 0 ? data.minionCap : 100;
+    deployZone_ = data.deployZone;
+
     tileMap_ = std::make_unique<TileMap>(data.width, data.height, data.tileSize);
 
     for (unsigned int y = 0; y < data.height; ++y) {
@@ -108,4 +128,26 @@ void Game::initializeTileMap() {
     commander_ = commander.get();
     setCameraTarget(commander_);
     entityManager_.addEntity(std::move(commander));
+}
+
+void Game::spawnMinion() {
+    if (!commander_ || !tileMap_)
+        return;
+    if (static_cast<int>(minions_.size()) >= maxMinions_)
+        return;
+
+    const sf::Vector2i cmdTile = tileMap_->worldToTile(commander_->getPosition());
+    if (cmdTile.x < 0 || cmdTile.y < 0 ||
+        static_cast<unsigned int>(cmdTile.x) >= tileMap_->getWidth() ||
+        static_cast<unsigned int>(cmdTile.y) >= tileMap_->getHeight())
+        return;
+    if (!tileMap_->hasFlag(static_cast<unsigned int>(cmdTile.x),
+                          static_cast<unsigned int>(cmdTile.y), FLAG_DEPLOY))
+        return;
+
+    const sf::Vector2f spawnPos = tileMap_->tileCentre(cmdTile);
+    auto minion = std::make_unique<Minion>(spawnPos);
+    Minion *ptr = minion.get();
+    minions_.push_back(ptr);
+    entityManager_.addEntity(std::move(minion));
 }

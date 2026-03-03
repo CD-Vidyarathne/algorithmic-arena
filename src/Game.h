@@ -4,8 +4,10 @@
 #include "World/MapLoader.h"
 #include "World/TileMap.h"
 #include <SFML/Graphics.hpp>
+#include <vector>
 
 class Entity;
+class Minion;
 class PlayerCommander;
 
 class Game {
@@ -25,6 +27,7 @@ class Game {
     void updateCamera();
 
     void initializeTileMap();
+    void spawnMinion();
 
     sf::RenderWindow window_;
     std::unique_ptr<TileMap> tileMap_;
@@ -34,4 +37,9 @@ class Game {
     sf::View gameView_;
     Entity* cameraTarget_ = nullptr;
     PlayerCommander* commander_ = nullptr;
+
+    int maxMinions_ = 100;
+    std::vector<sf::Vector2i> deployZone_;
+    std::vector<Minion*> minions_;
+    float spawnCooldown_ = 0.f;
 };

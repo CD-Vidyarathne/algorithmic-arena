@@ -38,6 +38,7 @@ pkg_check_modules(SFML REQUIRED sfml-system sfml-window sfml-graphics)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/Game.cpp
+    src/Entities/Minion.cpp
     src/Entities/PlayerCommander.cpp
     src/World/TileMap.cpp
     src/World/MapLoader.cpp
