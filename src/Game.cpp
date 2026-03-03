@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "Entities/Entity.h"
+#include "Entities/PlayerCommander.h"
 #include "Util/Logger.h"
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/System/Vector2.hpp>
@@ -14,7 +15,8 @@ Game::Game()
     window_.setFramerateLimit(60);
     initializeTileMap();
 
-    gameView_.setSize(sf::Vector2f(static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT)));
+    gameView_.setSize(sf::Vector2f(static_cast<float>(WINDOW_WIDTH),
+                                   static_cast<float>(WINDOW_HEIGHT)));
     const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
     const float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
     gameView_.setCenter(sf::Vector2f(mapW * 0.5f, mapH * 0.5f));
@@ -99,4 +101,11 @@ void Game::initializeTileMap() {
                 tileMap_->setFlag(x, y, FLAG_COMMANDER_START);
         }
     }
+
+    sf::Vector2f commanderPos =
+        tileMap_->tileCentre(sf::Vector2i(data.commanderStart.x, data.commanderStart.y));
+    auto commander = std::make_unique<PlayerCommander>(commanderPos);
+    commander_ = commander.get();
+    setCameraTarget(commander_);
+    entityManager_.addEntity(std::move(commander));
 }

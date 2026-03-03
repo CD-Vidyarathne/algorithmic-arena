@@ -6,13 +6,13 @@
 #include <SFML/Graphics.hpp>
 
 class Entity;
+class PlayerCommander;
 
 class Game {
   public:
     Game();
     void run();
 
-   
     void setCameraTarget(Entity* entity) { cameraTarget_ = entity; }
 
 
@@ -33,4 +33,5 @@ class Game {
 
     sf::View gameView_;
     Entity* cameraTarget_ = nullptr;
+    PlayerCommander* commander_ = nullptr;
 };
