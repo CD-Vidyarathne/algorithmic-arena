@@ -1,5 +1,6 @@
 #include "TileMap.h"
 #include "../Util/Logger.h"
+#include <algorithm>
 
 TileMap::TileMap(unsigned int width, unsigned int height, unsigned int tileSize)
     : width_(width), height_(height), tileSize_(tileSize), tiles_(width * height, TileType::Grass),
@@ -49,7 +50,39 @@ int TileMap::movementCost(unsigned int x, unsigned int y) const {
 }
 
 void TileMap::draw(sf::RenderWindow &window) {
-    window.draw(vertices_);
+    const sf::View &view = window.getView();
+    const sf::Vector2f &center = view.getCenter();
+    const sf::Vector2f &size = view.getSize();
+    const float left = center.x - size.x * 0.5f;
+    const float top = center.y - size.y * 0.5f;
+
+    int xMin = static_cast<int>(left / static_cast<float>(tileSize_));
+    int yMin = static_cast<int>(top / static_cast<float>(tileSize_));
+    int xMax = static_cast<int>((left + size.x) / static_cast<float>(tileSize_)) + 1;
+    int yMax = static_cast<int>((top + size.y) / static_cast<float>(tileSize_)) + 1;
+
+    xMin = std::max(0, xMin);
+    yMin = std::max(0, yMin);
+    xMax = std::min(static_cast<int>(width_), xMax);
+    yMax = std::min(static_cast<int>(height_), yMax);
+
+    if (xMin >= xMax || yMin >= yMax) {
+        return;
+    }
+
+    const unsigned int visW = static_cast<unsigned int>(xMax - xMin);
+    const unsigned int visH = static_cast<unsigned int>(yMax - yMin);
+    sf::VertexArray visible(sf::PrimitiveType::Triangles, visW * visH * 6);
+    std::size_t idx = 0;
+    for (unsigned int ty = static_cast<unsigned int>(yMin); ty < static_cast<unsigned int>(yMax); ++ty) {
+        for (unsigned int tx = static_cast<unsigned int>(xMin); tx < static_cast<unsigned int>(xMax); ++tx) {
+            const unsigned int vertexIndex = (ty * width_ + tx) * 6;
+            for (int i = 0; i < 6; ++i) {
+                visible[idx++] = vertices_[vertexIndex + i];
+            }
+        }
+    }
+    window.draw(visible);
 }
 
 bool TileMap::hasFlag(unsigned int x, unsigned int y, uint8_t bit) const {
