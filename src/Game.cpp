@@ -40,7 +40,7 @@ void Game::processEvents() {
             window_.close();
         }
         if (const auto *mouse = event->getIf<sf::Event::MouseButtonPressed>()) {
-            if (mouse->button == sf::Mouse::Button::Left) {
+            if (minimapVisible_ && mouse->button == sf::Mouse::Button::Left) {
                 const sf::Vector2i clickPos = sf::Mouse::getPosition(window_);
                 if (isMouseInMinimap(clickPos)) {
                     moveCameraToMinimapPosition(clickPos);
@@ -53,9 +53,14 @@ void Game::processEvents() {
                 const sf::Vector2f world = window_.mapPixelToCoords(pixel, gameView_);
                 commander_->setPosition(world);
             }
-            // Re-focus camera on commander (e.g. after moving view via minimap)
             if (key->code == sf::Keyboard::Key::C && commander_) {
                 setCameraTarget(commander_);
+            }
+            if (key->code == sf::Keyboard::Key::F) {
+                moveCameraToNextFlag();
+            }
+            if (key->code == sf::Keyboard::Key::M) {
+                minimapVisible_ = !minimapVisible_;
             }
         }
     }
@@ -133,7 +138,8 @@ void Game::render() {
         commander_->render(window_);
 
     window_.setView(window_.getDefaultView());
-    renderMinimap();
+    if (minimapVisible_)
+        renderMinimap();
     window_.display();
 }
 
@@ -192,11 +198,32 @@ void Game::moveCameraToMinimapPosition(sf::Vector2i pixel) {
     setCameraTarget(nullptr);  // stop following commander so view stays where we clicked
 }
 
+void Game::moveCameraToNextFlag() {
+    if (!tileMap_ || flagTilePositions_.empty())
+        return;
+    const sf::Vector2i tile = flagTilePositions_[flagCycleIndex_];
+    flagCycleIndex_ = (flagCycleIndex_ + 1) % flagTilePositions_.size();
+    const sf::Vector2f worldCentre = tileMap_->tileCentre(tile);
+
+    const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
+    const float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
+    const float halfW = gameView_.getSize().x * 0.5f;
+    const float halfH = gameView_.getSize().y * 0.5f;
+    const float minX = halfW;
+    const float maxX = std::max(minX, mapW - halfW);
+    const float minY = halfH;
+    const float maxY = std::max(minY, mapH - halfH);
+    gameView_.setCenter(
+        sf::Vector2f(std::clamp(worldCentre.x, minX, maxX), std::clamp(worldCentre.y, minY, maxY)));
+    setCameraTarget(nullptr);
+}
+
 void Game::initializeTileMap() {
     auto data = MapLoader::load("../maps/nexus_siege_512.map");
 
     maxMinions_ = data.minionCap > 0 ? data.minionCap : 100;
     deployZone_ = data.deployZone;
+    flagTilePositions_ = data.flagTiles;
 
     textureManager_ = std::make_unique<TextureManager>();
     if (!textureManager_->loadFromPath("assets") && !textureManager_->loadFromPath("../assets")) {
