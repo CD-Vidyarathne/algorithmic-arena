@@ -2,8 +2,10 @@
 
 #include "Entities/EntityManager.h"
 #include "World/MapLoader.h"
+#include "World/TextureManager.h"
 #include "World/TileMap.h"
 #include <SFML/Graphics.hpp>
+#include <memory>
 #include <vector>
 
 class Entity;
@@ -30,6 +32,7 @@ class Game {
     void spawnMinion();
 
     sf::RenderWindow window_;
+    std::unique_ptr<TextureManager> textureManager_;
     std::unique_ptr<TileMap> tileMap_;
     sf::Clock clock_;
     EntityManager entityManager_;

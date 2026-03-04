@@ -40,6 +40,7 @@ add_executable(${PROJECT_NAME}
     src/Game.cpp
     src/Entities/Minion.cpp
     src/Entities/PlayerCommander.cpp
+    src/World/TextureManager.cpp
     src/World/TileMap.cpp
     src/World/MapLoader.cpp
 )

@@ -123,7 +123,12 @@ void Game::initializeTileMap() {
     maxMinions_ = data.minionCap > 0 ? data.minionCap : 100;
     deployZone_ = data.deployZone;
 
-    tileMap_ = std::make_unique<TileMap>(data.width, data.height, data.tileSize);
+    textureManager_ = std::make_unique<TextureManager>();
+    if (!textureManager_->loadFromPath("../assets")) {
+        textureManager_.reset();
+    }
+    tileMap_ = std::make_unique<TileMap>(data.width, data.height, data.tileSize,
+                                        textureManager_.get());
 
     for (unsigned int y = 0; y < data.height; ++y) {
         for (unsigned int x = 0; x < data.width; ++x) {

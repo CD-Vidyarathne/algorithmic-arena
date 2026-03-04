@@ -4,9 +4,12 @@
 
 enum class TileType { Grass, Mud, Tree, Lava, Flag };
 
+class TextureManager;
+
 class TileMap {
   public:
-    TileMap(unsigned int width, unsigned int height, unsigned int tileSize);
+    TileMap(unsigned int width, unsigned int height, unsigned int tileSize,
+            const TextureManager *textureManager = nullptr);
 
     void setTile(unsigned int x, unsigned int y, TileType type);
     TileType getTile(unsigned int x, unsigned int y) const;
@@ -54,6 +57,7 @@ class TileMap {
     std::vector<uint8_t> flags_;
     std::vector<float> captureProgress_;
     sf::VertexArray vertices_;
+    const TextureManager *textureManager_ = nullptr;
 
     void updateVertices();
     sf::Color getTileColor(TileType type) const;

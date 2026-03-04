@@ -1,4 +1,5 @@
 #include "TileMap.h"
+#include "TextureManager.h"
 #include "../Util/Logger.h"
 #include <algorithm>
 
@@ -6,13 +7,15 @@ namespace {
 constexpr uint8_t TILE_FLAG_DEPLOY = 1u << 0;
 } // namespace
 
-TileMap::TileMap(unsigned int width, unsigned int height, unsigned int tileSize)
+TileMap::TileMap(unsigned int width, unsigned int height, unsigned int tileSize,
+                 const TextureManager *textureManager)
     : width_(width), height_(height), tileSize_(tileSize), tiles_(width * height, TileType::Grass),
       flags_(width * height, 0u), captureProgress_(width * height, 0.0f),
-      vertices_(sf::PrimitiveType::Triangles, width * height * 6) {
+      vertices_(sf::PrimitiveType::Triangles, width * height * 6),
+      textureManager_(textureManager) {
     updateVertices();
     Logger::get()->info("Tilemap Initialized ({}x{}, tileSize={})", width_, height_, tileSize_);
-};
+}
 
 void TileMap::setTile(unsigned int x, unsigned int y, TileType type) {
     if (x >= width_ || y >= height_) {
@@ -74,21 +77,59 @@ void TileMap::draw(sf::RenderWindow &window) {
         return;
     }
 
-    const unsigned int visW = static_cast<unsigned int>(xMax - xMin);
-    const unsigned int visH = static_cast<unsigned int>(yMax - yMin);
-    sf::VertexArray visible(sf::PrimitiveType::Triangles, visW * visH * 6);
-    std::size_t idx = 0;
-    for (unsigned int ty = static_cast<unsigned int>(yMin);
-         ty < static_cast<unsigned int>(yMax); ++ty) {
-        for (unsigned int tx = static_cast<unsigned int>(xMin);
-             tx < static_cast<unsigned int>(xMax); ++tx) {
-            const unsigned int vertexIndex = (ty * width_ + tx) * 6;
-            for (int i = 0; i < 6; ++i) {
-                visible[idx++] = vertices_[vertexIndex + i];
+    const bool useTextures = textureManager_ && textureManager_->isLoaded();
+
+    if (useTextures) {
+        const sf::Vector2f texSize(1.f, 1.f);
+        for (int t = 0; t < 5; ++t) {
+            const TileType type = static_cast<TileType>(t);
+            sf::VertexArray va(sf::PrimitiveType::Triangles);
+
+            for (unsigned int ty = static_cast<unsigned int>(yMin);
+                 ty < static_cast<unsigned int>(yMax); ++ty) {
+                for (unsigned int tx = static_cast<unsigned int>(xMin);
+                     tx < static_cast<unsigned int>(xMax); ++tx) {
+                    const std::size_t index = static_cast<std::size_t>(ty) * width_ + tx;
+                    if (tiles_[index] != type)
+                        continue;
+
+                    const float px = static_cast<float>(tx * tileSize_);
+                    const float py = static_cast<float>(ty * tileSize_);
+                    const float pr = px + static_cast<float>(tileSize_);
+                    const float pb = py + static_cast<float>(tileSize_);
+
+                    sf::Color tint = sf::Color::White;
+                    if ((flags_[index] & TILE_FLAG_DEPLOY) != 0u)
+                        tint = sf::Color(230, 240, 255);
+
+                    va.append(sf::Vertex(sf::Vector2f(px, py), tint, sf::Vector2f(0.f, 0.f)));
+                    va.append(sf::Vertex(sf::Vector2f(px, pb), tint, sf::Vector2f(0.f, texSize.y)));
+                    va.append(sf::Vertex(sf::Vector2f(pr, py), tint, sf::Vector2f(texSize.x, 0.f)));
+                    va.append(sf::Vertex(sf::Vector2f(px, pb), tint, sf::Vector2f(0.f, texSize.y)));
+                    va.append(sf::Vertex(sf::Vector2f(pr, pb), tint, sf::Vector2f(texSize.x, texSize.y)));
+                    va.append(sf::Vertex(sf::Vector2f(pr, py), tint, sf::Vector2f(texSize.x, 0.f)));
+                }
+            }
+            if (va.getVertexCount() > 0u)
+                window.draw(va, sf::RenderStates(&textureManager_->getTexture(type)));
+        }
+    } else {
+        const unsigned int visW = static_cast<unsigned int>(xMax - xMin);
+        const unsigned int visH = static_cast<unsigned int>(yMax - yMin);
+        sf::VertexArray visible(sf::PrimitiveType::Triangles, visW * visH * 6);
+        std::size_t idx = 0;
+        for (unsigned int ty = static_cast<unsigned int>(yMin);
+             ty < static_cast<unsigned int>(yMax); ++ty) {
+            for (unsigned int tx = static_cast<unsigned int>(xMin);
+                 tx < static_cast<unsigned int>(xMax); ++tx) {
+                const unsigned int vertexIndex = (ty * width_ + tx) * 6;
+                for (int i = 0; i < 6; ++i) {
+                    visible[idx++] = vertices_[vertexIndex + i];
+                }
             }
         }
+        window.draw(visible);
     }
-    window.draw(visible);
 
     const sf::Color outlineColor(100, 180, 255);
     sf::RectangleShape outline(
