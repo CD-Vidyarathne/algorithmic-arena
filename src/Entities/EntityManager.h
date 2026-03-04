@@ -30,6 +30,13 @@ class EntityManager {
         }
     }
 
+    void renderAllExcept(sf::RenderWindow &window, const Entity *exclude) {
+        for (auto &entity : entities_) {
+            if (entity.get() != exclude)
+                entity->render(window);
+        }
+    }
+
     const std::vector<std::unique_ptr<Entity>> &getEntities() const {
         return entities_;
     }

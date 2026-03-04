@@ -109,7 +109,9 @@ void Game::render() {
         tileMap_->draw(window_);
     }
 
-    entityManager_.renderAll(window_);
+    entityManager_.renderAllExcept(window_, commander_);
+    if (commander_)
+        commander_->render(window_);
 
     window_.setView(window_.getDefaultView());
     window_.display();

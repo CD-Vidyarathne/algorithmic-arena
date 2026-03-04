@@ -5,7 +5,7 @@
 #include <cmath>
 
 namespace {
-const float COMMANDER_DISPLAY_SIZE = 32.f;
+const float COMMANDER_DISPLAY_SIZE = 64.f;
 }
 
 PlayerCommander::PlayerCommander(sf::Vector2f position)
@@ -78,4 +78,3 @@ void PlayerCommander::render(sf::RenderWindow &window) {
     sprite_->setPosition(getPosition());
     window.draw(*sprite_);
 }
-
