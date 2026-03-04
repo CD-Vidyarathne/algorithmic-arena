@@ -39,6 +39,25 @@ void Game::processEvents() {
             Logger::get()->warn("Window closing event detected");
             window_.close();
         }
+        if (const auto *mouse = event->getIf<sf::Event::MouseButtonPressed>()) {
+            if (mouse->button == sf::Mouse::Button::Left) {
+                const sf::Vector2i clickPos = sf::Mouse::getPosition(window_);
+                if (isMouseInMinimap(clickPos)) {
+                    moveCameraToMinimapPosition(clickPos);
+                }
+            }
+        }
+        if (const auto *key = event->getIf<sf::Event::KeyPressed>()) {
+            if (key->code == sf::Keyboard::Key::T && commander_) {
+                const sf::Vector2i pixel(sf::Mouse::getPosition(window_));
+                const sf::Vector2f world = window_.mapPixelToCoords(pixel, gameView_);
+                commander_->setPosition(world);
+            }
+            // Re-focus camera on commander (e.g. after moving view via minimap)
+            if (key->code == sf::Keyboard::Key::C && commander_) {
+                setCameraTarget(commander_);
+            }
+        }
     }
 }
 
@@ -87,8 +106,8 @@ void Game::updateCamera() {
     if (cameraTarget_) {
         centre = cameraTarget_->getPosition();
     } else {
-        centre.x = mapW * 0.5f;
-        centre.y = mapH * 0.5f;
+        // No target (e.g. after minimap click): keep current view center, only clamp to map
+        centre = gameView_.getCenter();
     }
 
     const float minX = (mapW >= gameView_.getSize().x) ? halfW : mapW * 0.5f;
@@ -114,7 +133,63 @@ void Game::render() {
         commander_->render(window_);
 
     window_.setView(window_.getDefaultView());
+    renderMinimap();
     window_.display();
+}
+
+void Game::renderMinimap() {
+    if (!tileMap_)
+        return;
+    const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
+    const float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
+    const sf::Vector2u winSize = window_.getSize();
+
+    minimapPixelBounds_.position.x = minimapViewport_.position.x * static_cast<float>(winSize.x);
+    minimapPixelBounds_.position.y = minimapViewport_.position.y * static_cast<float>(winSize.y);
+    minimapPixelBounds_.size.x = minimapViewport_.size.x * static_cast<float>(winSize.x);
+    minimapPixelBounds_.size.y = minimapViewport_.size.y * static_cast<float>(winSize.y);
+
+    sf::View minimapView;
+    minimapView.setViewport(minimapViewport_);
+    minimapView.setSize(sf::Vector2f(mapW, mapH));
+    minimapView.setCenter(sf::Vector2f(mapW * 0.5f, mapH * 0.5f));
+
+    window_.setView(minimapView);
+    tileMap_->draw(window_);
+
+    sf::RectangleShape viewRect(gameView_.getSize());
+    viewRect.setPosition(gameView_.getCenter() - gameView_.getSize() * 0.5f);
+    viewRect.setFillColor(sf::Color::Transparent);
+    viewRect.setOutlineColor(sf::Color::White);
+    viewRect.setOutlineThickness(2.f);
+    window_.draw(viewRect);
+
+    window_.setView(window_.getDefaultView());
+}
+
+bool Game::isMouseInMinimap(sf::Vector2i pixel) const {
+    return minimapPixelBounds_.contains(sf::Vector2f(static_cast<float>(pixel.x), static_cast<float>(pixel.y)));
+}
+
+void Game::moveCameraToMinimapPosition(sf::Vector2i pixel) {
+    if (!tileMap_ || minimapPixelBounds_.size.x <= 0.f || minimapPixelBounds_.size.y <= 0.f)
+        return;
+    const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
+    const float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
+
+    const float nx = (static_cast<float>(pixel.x) - minimapPixelBounds_.position.x) / minimapPixelBounds_.size.x;
+    const float ny = (static_cast<float>(pixel.y) - minimapPixelBounds_.position.y) / minimapPixelBounds_.size.y;
+    const float worldX = nx * mapW;
+    const float worldY = ny * mapH;
+
+    const float halfW = gameView_.getSize().x * 0.5f;
+    const float halfH = gameView_.getSize().y * 0.5f;
+    const float minX = halfW;
+    const float maxX = std::max(minX, mapW - halfW);
+    const float minY = halfH;
+    const float maxY = std::max(minY, mapH - halfH);
+    gameView_.setCenter(sf::Vector2f(std::clamp(worldX, minX, maxX), std::clamp(worldY, minY, maxY)));
+    setCameraTarget(nullptr);  // stop following commander so view stays where we clicked
 }
 
 void Game::initializeTileMap() {

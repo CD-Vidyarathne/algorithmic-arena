@@ -27,6 +27,9 @@ class Game {
     void update(float dt);
     void render();
     void updateCamera();
+    void renderMinimap();
+    bool isMouseInMinimap(sf::Vector2i pixel) const;
+    void moveCameraToMinimapPosition(sf::Vector2i pixel);
 
     void initializeTileMap();
     void spawnMinion();
@@ -38,6 +41,8 @@ class Game {
     EntityManager entityManager_;
 
     sf::View gameView_;
+    sf::FloatRect minimapViewport_{sf::Vector2f(0.75f, 0.75f), sf::Vector2f(0.25f, 0.25f)};  // normalized 0-1
+    sf::FloatRect minimapPixelBounds_;  // updated each frame in renderMinimap for exact hit test
     Entity* cameraTarget_ = nullptr;
     PlayerCommander* commander_ = nullptr;
 
