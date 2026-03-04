@@ -129,8 +129,7 @@ MapData MapLoader::load(const std::string &path) {
                     data.flagTiles.emplace_back(static_cast<int>(x), static_cast<int>(y));
                     break;
                 case 'D':
-                    tile = TileType::Grass;
-                    flags |= FLAG_DEPLOY;
+                    tile = TileType::Deploy;
                     data.deployZone.emplace_back(static_cast<int>(x), static_cast<int>(y));
                     break;
                 case 'E':
@@ -161,19 +160,6 @@ MapData MapLoader::load(const std::string &path) {
     }
     if (data.flagTiles.empty()) {
         Logger::get()->error("MapLoader: no Flag tiles (F) found in {}", path);
-    }
-
-    const unsigned int deployBorderWidth = 3u;
-    for (const auto &p : data.deployZone) {
-        const unsigned int x = static_cast<unsigned int>(p.x);
-        const unsigned int y = static_cast<unsigned int>(p.y);
-        const bool onBorder = x < deployBorderWidth || y < deployBorderWidth ||
-                              x >= data.width - deployBorderWidth ||
-                              y >= data.height - deployBorderWidth;
-        if (!onBorder) {
-            Logger::get()->warn("MapLoader: deploy tile D at interior position ({}, {}) in {}", x,
-                                y, path);
-        }
     }
 
     Logger::get()->info("Map loaded: {} ({}x{}, tileSize={}, flags={}, F tiles={})", data.name,

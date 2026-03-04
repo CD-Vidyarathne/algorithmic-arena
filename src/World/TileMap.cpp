@@ -1,18 +1,13 @@
 #include "TileMap.h"
-#include "TextureManager.h"
 #include "../Util/Logger.h"
+#include "TextureManager.h"
 #include <algorithm>
-
-namespace {
-constexpr uint8_t TILE_FLAG_DEPLOY = 1u << 0;
-} // namespace
 
 TileMap::TileMap(unsigned int width, unsigned int height, unsigned int tileSize,
                  const TextureManager *textureManager)
     : width_(width), height_(height), tileSize_(tileSize), tiles_(width * height, TileType::Grass),
       flags_(width * height, 0u), captureProgress_(width * height, 0.0f),
-      vertices_(sf::PrimitiveType::Triangles, width * height * 6),
-      textureManager_(textureManager) {
+      vertices_(sf::PrimitiveType::Triangles, width * height * 6), textureManager_(textureManager) {
     updateVertices();
     Logger::get()->info("Tilemap Initialized ({}x{}, tileSize={})", width_, height_, tileSize_);
 }
@@ -46,6 +41,7 @@ int TileMap::movementCost(unsigned int x, unsigned int y) const {
     switch (getTile(x, y)) {
         case TileType::Grass:
         case TileType::Flag:
+        case TileType::Deploy:
             return 10;
         case TileType::Mud:
             return 17;
@@ -80,11 +76,14 @@ void TileMap::draw(sf::RenderWindow &window) {
     const bool useTextures = textureManager_ && textureManager_->isLoaded();
 
     if (useTextures) {
-        const sf::Vector2f texSize(1.f, 1.f);
-        for (int t = 0; t < 5; ++t) {
+        for (int t = 0; t < 6; ++t) {
             const TileType type = static_cast<TileType>(t);
-            sf::VertexArray va(sf::PrimitiveType::Triangles);
+            const sf::Texture &tex = textureManager_->getTexture(type);
+            const sf::Vector2u texSize = tex.getSize();
+            const float tw = static_cast<float>(texSize.x);
+            const float th = static_cast<float>(texSize.y);
 
+            sf::VertexArray va(sf::PrimitiveType::Triangles);
             for (unsigned int ty = static_cast<unsigned int>(yMin);
                  ty < static_cast<unsigned int>(yMax); ++ty) {
                 for (unsigned int tx = static_cast<unsigned int>(xMin);
@@ -98,20 +97,18 @@ void TileMap::draw(sf::RenderWindow &window) {
                     const float pr = px + static_cast<float>(tileSize_);
                     const float pb = py + static_cast<float>(tileSize_);
 
-                    sf::Color tint = sf::Color::White;
-                    if ((flags_[index] & TILE_FLAG_DEPLOY) != 0u)
-                        tint = sf::Color(230, 240, 255);
-
+                    const sf::Color tint = sf::Color::White;
+                    // SFML texCoords are in texture pixel coordinates, not 0-1
                     va.append(sf::Vertex(sf::Vector2f(px, py), tint, sf::Vector2f(0.f, 0.f)));
-                    va.append(sf::Vertex(sf::Vector2f(px, pb), tint, sf::Vector2f(0.f, texSize.y)));
-                    va.append(sf::Vertex(sf::Vector2f(pr, py), tint, sf::Vector2f(texSize.x, 0.f)));
-                    va.append(sf::Vertex(sf::Vector2f(px, pb), tint, sf::Vector2f(0.f, texSize.y)));
-                    va.append(sf::Vertex(sf::Vector2f(pr, pb), tint, sf::Vector2f(texSize.x, texSize.y)));
-                    va.append(sf::Vertex(sf::Vector2f(pr, py), tint, sf::Vector2f(texSize.x, 0.f)));
+                    va.append(sf::Vertex(sf::Vector2f(px, pb), tint, sf::Vector2f(0.f, th)));
+                    va.append(sf::Vertex(sf::Vector2f(pr, py), tint, sf::Vector2f(tw, 0.f)));
+                    va.append(sf::Vertex(sf::Vector2f(px, pb), tint, sf::Vector2f(0.f, th)));
+                    va.append(sf::Vertex(sf::Vector2f(pr, pb), tint, sf::Vector2f(tw, th)));
+                    va.append(sf::Vertex(sf::Vector2f(pr, py), tint, sf::Vector2f(tw, 0.f)));
                 }
             }
             if (va.getVertexCount() > 0u)
-                window.draw(va, sf::RenderStates(&textureManager_->getTexture(type)));
+                window.draw(va, sf::RenderStates(&tex));
         }
     } else {
         const unsigned int visW = static_cast<unsigned int>(xMax - xMin);
@@ -129,28 +126,6 @@ void TileMap::draw(sf::RenderWindow &window) {
             }
         }
         window.draw(visible);
-    }
-
-    const sf::Color outlineColor(100, 180, 255);
-    sf::RectangleShape outline(
-        sf::Vector2f(static_cast<float>(tileSize_), static_cast<float>(tileSize_)));
-    outline.setFillColor(sf::Color::Transparent);
-    outline.setOutlineThickness(1.f);
-    outline.setOutlineColor(outlineColor);
-
-    for (unsigned int ty = static_cast<unsigned int>(yMin);
-         ty < static_cast<unsigned int>(yMax); ++ty) {
-        for (unsigned int tx = static_cast<unsigned int>(xMin);
-             tx < static_cast<unsigned int>(xMax); ++tx) {
-            const std::size_t index = static_cast<std::size_t>(ty) * width_ + tx;
-            if ((flags_[index] & TILE_FLAG_DEPLOY) == 0u)
-                continue;
-
-            outline.setPosition(
-                sf::Vector2f(static_cast<float>(tx * tileSize_),
-                             static_cast<float>(ty * tileSize_)));
-            window.draw(outline);
-        }
     }
 }
 
@@ -209,14 +184,6 @@ void TileMap::updateTileVertices(unsigned int x, unsigned int y) {
     unsigned int tileIndex = y * width_ + x;
     unsigned int vertexIndex = tileIndex * 6;
     sf::Color color = getTileColor(tiles_[tileIndex]);
-    if ((flags_[tileIndex] & TILE_FLAG_DEPLOY) != 0u) {
-        const int r = std::min(255, static_cast<int>(color.r) + 10);
-        const int g = std::min(255, static_cast<int>(color.g) + 20);
-        const int b = std::min(255, static_cast<int>(color.b) + 60);
-        color.r = static_cast<decltype(color.r)>(r);
-        color.g = static_cast<decltype(color.g)>(g);
-        color.b = static_cast<decltype(color.b)>(b);
-    }
     float posX = static_cast<float>(x * tileSize_);
     float posY = static_cast<float>(y * tileSize_);
     sf::Vector2f topLeft(posX, posY);
@@ -247,6 +214,8 @@ sf::Color TileMap::getTileColor(TileType type) const {
             return sf::Color(200, 60, 10);
         case TileType::Flag:
             return sf::Color(200, 200, 50);
+        case TileType::Deploy:
+            return sf::Color(180, 190, 200);
     }
     return sf::Color::White;
 }

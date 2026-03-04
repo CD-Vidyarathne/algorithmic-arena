@@ -2,7 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 
-enum class TileType { Grass, Mud, Tree, Lava, Flag };
+enum class TileType { Grass, Mud, Tree, Lava, Flag, Deploy };
 
 class TextureManager;
 

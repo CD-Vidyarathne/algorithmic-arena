@@ -13,6 +13,8 @@ std::size_t TextureManager::tileTypeToIndex(TileType type) {
             return 3;
         case TileType::Flag:
             return 4;
+        case TileType::Deploy:
+            return 5;
     }
     return 0;
 }
@@ -24,11 +26,9 @@ bool TextureManager::loadFromPath(const std::string &basePath) {
         TileType type;
     };
     const Entry entries[] = {
-        {"grass.png", TileType::Grass},
-        {"mud.png", TileType::Mud},
-        {"tree.png", TileType::Tree},
-        {"lava.png", TileType::Lava},
-        {"flag.png", TileType::Flag},
+        {"grass.png", TileType::Grass}, {"mud.png", TileType::Mud},
+        {"tree.png", TileType::Tree},   {"lava.png", TileType::Lava},
+        {"flag.png", TileType::Flag},   {"deploy.png", TileType::Deploy},
     };
 
     loaded_ = true;
@@ -36,7 +36,7 @@ bool TextureManager::loadFromPath(const std::string &basePath) {
         const std::string path = dir + "/" + e.filename;
         const std::size_t idx = tileTypeToIndex(e.type);
         if (!textures_[idx].loadFromFile(path)) {
-            Logger::get()->warn("TextureManager: failed to load {}", path);
+            Logger::get()->warn("TextureManager: failed to load '{}' (cwd may be wrong)", path);
             loaded_ = false;
         }
     }

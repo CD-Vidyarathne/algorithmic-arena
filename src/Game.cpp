@@ -17,8 +17,8 @@ Game::Game()
     window_.setFramerateLimit(60);
     initializeTileMap();
 
-    gameView_.setSize(sf::Vector2f(static_cast<float>(WINDOW_WIDTH),
-                                   static_cast<float>(WINDOW_HEIGHT)));
+    gameView_.setSize(
+        sf::Vector2f(static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT)));
     const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
     const float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
     gameView_.setCenter(sf::Vector2f(mapW * 0.5f, mapH * 0.5f));
@@ -46,9 +46,9 @@ void Game::update(float dt) {
     entityManager_.updateAll(dt);
     entityManager_.removeDeadEntities();
 
-    minions_.erase(std::remove_if(minions_.begin(), minions_.end(),
-                      [](Minion *m) { return !m->isAlive(); }),
-                   minions_.end());
+    minions_.erase(
+        std::remove_if(minions_.begin(), minions_.end(), [](Minion *m) { return !m->isAlive(); }),
+        minions_.end());
 
     if (commander_ && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
         spawnCooldown_ -= dt;
@@ -62,10 +62,8 @@ void Game::update(float dt) {
 
     if (commander_ && tileMap_) {
         sf::Vector2f pos = commander_->getPosition();
-        const float mapW =
-            static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
-        const float mapH =
-            static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
+        const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
+        const float mapH = static_cast<float>(tileMap_->getHeight() * tileMap_->getTileSize());
         const sf::Vector2f size = commander_->getSize();
 
         const float maxX = std::max(0.f, mapW - size.x);
@@ -92,7 +90,7 @@ void Game::updateCamera() {
         centre.x = mapW * 0.5f;
         centre.y = mapH * 0.5f;
     }
-   
+
     const float minX = (mapW >= gameView_.getSize().x) ? halfW : mapW * 0.5f;
     const float maxX = (mapW >= gameView_.getSize().x) ? (mapW - halfW) : mapW * 0.5f;
     const float minY = (mapH >= gameView_.getSize().y) ? halfH : mapH * 0.5f;
@@ -118,24 +116,23 @@ void Game::render() {
 }
 
 void Game::initializeTileMap() {
-    auto data = MapLoader::load("../maps/benchmark_maze_512.map");
+    auto data = MapLoader::load("../maps/nexus_siege_512.map");
 
     maxMinions_ = data.minionCap > 0 ? data.minionCap : 100;
     deployZone_ = data.deployZone;
 
     textureManager_ = std::make_unique<TextureManager>();
-    if (!textureManager_->loadFromPath("../assets")) {
+    if (!textureManager_->loadFromPath("assets") && !textureManager_->loadFromPath("../assets")) {
+        Logger::get()->warn("TextureManager: no tile textures loaded; using colored tiles");
         textureManager_.reset();
     }
-    tileMap_ = std::make_unique<TileMap>(data.width, data.height, data.tileSize,
-                                        textureManager_.get());
+    tileMap_ =
+        std::make_unique<TileMap>(data.width, data.height, data.tileSize, textureManager_.get());
 
     for (unsigned int y = 0; y < data.height; ++y) {
         for (unsigned int x = 0; x < data.width; ++x) {
             std::size_t i = y * data.width + x;
             tileMap_->setTile(x, y, data.tiles[i]);
-            if (data.flags[i] & FLAG_DEPLOY)
-                tileMap_->setFlag(x, y, FLAG_DEPLOY);
             if (data.flags[i] & FLAG_ENTRANCE)
                 tileMap_->setFlag(x, y, FLAG_ENTRANCE);
             if (data.flags[i] & FLAG_COMMANDER_START)
@@ -162,8 +159,8 @@ void Game::spawnMinion() {
         static_cast<unsigned int>(cmdTile.x) >= tileMap_->getWidth() ||
         static_cast<unsigned int>(cmdTile.y) >= tileMap_->getHeight())
         return;
-    if (!tileMap_->hasFlag(static_cast<unsigned int>(cmdTile.x),
-                          static_cast<unsigned int>(cmdTile.y), FLAG_DEPLOY))
+    if (tileMap_->getTile(static_cast<unsigned int>(cmdTile.x),
+                          static_cast<unsigned int>(cmdTile.y)) != TileType::Deploy)
         return;
 
     const sf::Vector2f spawnPos = tileMap_->tileCentre(cmdTile);
