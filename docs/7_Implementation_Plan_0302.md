@@ -957,18 +957,18 @@ Insert map system work between step 1 (entities) and step 2 (collision) in the R
 
 **Revised full order:**
 
-1. Pre-condition fixes (0a–0d) — ~2h
-2. **Map system: `TileType` enum expansion + `TileMap` updates (9j) + `MapLoader` (9d) + generate_maps.py + first `.map` file** — ~4–5h. This gives a real 512×512 world to work in for all subsequent steps.
-3. **Camera (`sf::View`) + frustum culling** (9f) — ~2h. Required to navigate the large map.
-4. Algorithm system construction in Game + `initializeEntities()` — ~1h
+1. Pre-condition fixes (0a–0d) — ~2h DONE
+2. **Map system: `TileType` enum expansion + `TileMap` updates (9j) + `MapLoader` (9d) + generate_maps.py + first `.map` file** — ~4–5h. This gives a real 512×512 world to work in for all subsequent steps. DONE
+3. **Camera (`sf::View`) + frustum culling** (9f) — ~2h. Required to navigate the large map. DONE
+4. Algorithm system construction in Game + `initializeEntities()` — ~1h DONE
 5. `ICollisionSystem` + `BruteForceCollisionSystem` + Game integration — ~3–4h
 6. `QuadtreeCollisionSystem` — ~4–5h. **Report-ready: collision comparison.**
-7. `PlayerCommander` + movement — ~1–2h
+7. `PlayerCommander` + movement — ~1–2h DONE
 8. `IPathfindingSystem` + `Dijkstra` + `A*` + weighted costs (9i) — ~4–5h
 9. `Minion` AI + pathfinding — ~2–3h. **Report-ready: pathfinding comparison.**
 10. Flag tile capture logic + win/lose (replaces NexusCore entity) — ~2h
-11. Commander deploy-zone enforcement + `spawnMinion()` — ~1h
-12. `TextureManager` + textured rendering (Option A, 9c) — ~4–5h
+11. Commander deploy-zone enforcement + `spawnMinion()` — ~1h DONE
+12. `TextureManager` + textured rendering (Option A, 9c) — ~4–5h DONE
 13. `Timer` + `DebugOverlay` + font — ~2–3h
 14. CSV logging — ~1h
 15. `ScenarioManager` using MapLoader (9h) — ~1–2h
