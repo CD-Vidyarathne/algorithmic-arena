@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Entity.h"
-#include <SFML/Graphics/RectangleShape.hpp>
+#include <SFML/Graphics/Sprite.hpp>
+#include <SFML/Graphics/Texture.hpp>
+#include <optional>
 
 class PlayerCommander : public Entity {
   public:
@@ -11,7 +13,11 @@ class PlayerCommander : public Entity {
     void render(sf::RenderWindow &window) override;
 
   private:
-    sf::RectangleShape shape_;
+    void updateRotationFromVelocity();
+
+    sf::Texture texture_;
+    std::optional<sf::Sprite> sprite_;
     float speed_ = 200.f;
+    float lastAngleDeg_ = 0.f;
 };
 
