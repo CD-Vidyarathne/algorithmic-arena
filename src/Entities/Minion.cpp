@@ -9,8 +9,7 @@ const float MINION_DISPLAY_SIZE = 24.f;
 
 Minion::Minion(sf::Vector2f position)
     : Entity(position, sf::Vector2f(20.f, 20.f), sf::Color::Cyan) {
-    if (!texture_.loadFromFile("assets/Characters/Minion/minion_up.png") &&
-        !texture_.loadFromFile("../assets/Characters/Minion/minion_up.png")) {
+    if (!texture_.loadFromFile("../assets/Characters/Minion/minion_up.png")) {
         Logger::get()->warn("Minion: could not load minion_up.png");
     } else {
         sprite_.emplace(texture_);

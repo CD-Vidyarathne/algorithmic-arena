@@ -10,8 +10,7 @@ const float COMMANDER_DISPLAY_SIZE = 64.f;
 
 PlayerCommander::PlayerCommander(sf::Vector2f position)
     : Entity(position, sf::Vector2f(28.f, 28.f), sf::Color::Blue) {
-    if (!texture_.loadFromFile("assets/Characters/Commander/com_up.png") &&
-        !texture_.loadFromFile("../assets/Characters/Commander/com_up.png")) {
+    if (!texture_.loadFromFile("../assets/Characters/Commander/com_up.png")) {
         Logger::get()->warn("PlayerCommander: could not load com_up.png, will not draw");
     } else {
         sprite_.emplace(texture_);
