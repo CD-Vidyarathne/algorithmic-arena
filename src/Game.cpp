@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "Algorithms/Collision/BruteForceCollisionSystem.h"
+#include "Algorithms/Collision/QuadtreeCollisionSystem.h"
 #include "Entities/Entity.h"
 #include "Entities/Minion.h"
 #include "Entities/PlayerCommander.h"
@@ -18,9 +19,17 @@ Game::Game()
     window_.setFramerateLimit(60);
 
 #ifdef USE_QUADTREE_COLLISION
-    // QuadtreeCollisionSystem will be wired in step 6.
+    collisionSystem_ = std::make_unique<QuadtreeCollisionSystem>();
+    Logger::get()->info("Collision system: QuadtreeCollisionSystem (USE_QUADTREE_COLLISION)");
 #else
     collisionSystem_ = std::make_unique<BruteForceCollisionSystem>();
+    Logger::get()->info("Collision system: BruteForceCollisionSystem");
+#endif
+
+#ifdef USE_ASTAR_PATHFINDING
+    Logger::get()->info("Pathfinding algorithm: A* (USE_ASTAR_PATHFINDING)");
+#else
+    Logger::get()->info("Pathfinding algorithm: Dijkstra");
 #endif
 
     initializeTileMap();
@@ -249,7 +258,7 @@ void Game::initializeTileMap() {
     flagTilePositions_ = data.flagTiles;
 
     textureManager_ = std::make_unique<TextureManager>();
-    if (!textureManager_->loadFromPath("assets") && !textureManager_->loadFromPath("../assets")) {
+    if (!textureManager_->loadFromPath("../assets")) {
         Logger::get()->warn("TextureManager: no tile textures loaded; using colored tiles");
         textureManager_.reset();
     }
