@@ -37,9 +37,9 @@ class EntityManager {
         }
     }
 
-    const std::vector<std::unique_ptr<Entity>> &getEntities() const {
-        return entities_;
-    }
+    const std::vector<std::unique_ptr<Entity>> &getEntities() const { return entities_; }
+
+    std::vector<std::unique_ptr<Entity>> &getEntities() { return entities_; }
 
   private:
     std::vector<std::unique_ptr<Entity>> entities_;

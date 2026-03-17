@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "Algorithms/Collision/BruteForceCollisionSystem.h"
 #include "Entities/Entity.h"
 #include "Entities/Minion.h"
 #include "Entities/PlayerCommander.h"
@@ -15,6 +16,13 @@ Game::Game()
     : window_(sf::VideoMode(sf::Vector2u(WINDOW_WIDTH, WINDOW_HEIGHT)), "Algorithmic Arena") {
     Logger::get()->info("Game initialized");
     window_.setFramerateLimit(60);
+
+#ifdef USE_QUADTREE_COLLISION
+    // QuadtreeCollisionSystem will be wired in step 6.
+#else
+    collisionSystem_ = std::make_unique<BruteForceCollisionSystem>();
+#endif
+
     initializeTileMap();
 
     gameView_.setSize(
@@ -63,12 +71,18 @@ void Game::processEvents() {
             if (key->code == sf::Keyboard::Key::M) {
                 minimapVisible_ = !minimapVisible_;
             }
+            if (key->code == sf::Keyboard::Key::F1) {
+                debugCollision_ = !debugCollision_;
+            }
         }
     }
 }
 
 void Game::update(float dt) {
     entityManager_.updateAll(dt);
+    if (collisionSystem_ && tileMap_) {
+        collisionSystem_->update(entityManager_, *tileMap_);
+    }
     entityManager_.removeDeadEntities();
 
     minions_.erase(
@@ -136,6 +150,10 @@ void Game::render() {
     entityManager_.renderAllExcept(window_, commander_);
     if (commander_)
         commander_->render(window_);
+
+    if (debugCollision_ && collisionSystem_) {
+        collisionSystem_->drawDebug(window_);
+    }
 
     window_.setView(window_.getDefaultView());
     if (minimapVisible_)

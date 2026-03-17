@@ -4,6 +4,7 @@
 #include "World/MapLoader.h"
 #include "World/TextureManager.h"
 #include "World/TileMap.h"
+#include "Algorithms/Collision/ICollisionSystem.h"
 #include <SFML/Graphics.hpp>
 #include <cstddef>
 #include <memory>
@@ -12,6 +13,8 @@
 class Entity;
 class Minion;
 class PlayerCommander;
+
+enum class GameState { Playing, Won, Lost };
 
 class Game {
   public:
@@ -56,4 +59,16 @@ class Game {
     std::vector<sf::Vector2i> deployZone_;
     std::vector<Minion*> minions_;
     float spawnCooldown_ = 0.f;
+
+    GameState gameState_ = GameState::Playing;
+    float gameTimer_ = 0.f;
+    float timeLimitSeconds_ = 180.f;
+    bool hasSpawnedMinion_ = false;
+
+    // UI font and end-game text will be wired in a later step.
+    // sf::Font uiFont_;
+    // sf::Text endText_;
+
+    std::unique_ptr<ICollisionSystem> collisionSystem_;
+    bool debugCollision_ = false;
 };

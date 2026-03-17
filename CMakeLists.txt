@@ -43,6 +43,7 @@ add_executable(${PROJECT_NAME}
     src/World/TextureManager.cpp
     src/World/TileMap.cpp
     src/World/MapLoader.cpp
+    src/Algorithms/Collision/BruteForceCollisionSystem.cpp
 )
 
 # add_executable(${PROJECT_NAME} ${SOURCES})
