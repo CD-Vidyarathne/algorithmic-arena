@@ -33,7 +33,7 @@ class Game {
     void processEvents();
     void update(float dt);
     void render();
-    void updateCamera();
+    void updateCamera(float dt);
     void renderMinimap();
     bool isMouseInMinimap(sf::Vector2i pixel) const;
     void moveCameraToMinimapPosition(sf::Vector2i pixel);
@@ -43,9 +43,18 @@ class Game {
     void startMatch();
     void updateGameplay(float dt);
     void issueOrderToTile(const sf::Vector2i& targetTile);
+    void issueOrderToSelectionOrAll(const sf::Vector2i& targetTile);
     void orderMinionsToNearestUncapturedFlag();
     sf::Vector2i nearestUncapturedFlagForTile(const sf::Vector2i& from) const;
     void refreshMinionList();
+    void handleWorldLeftClick(sf::Vector2i pixel);
+    void beginSelectionDrag(sf::Vector2i pixel);
+    void updateSelectionDrag(sf::Vector2i pixel);
+    void finalizeSelectionDrag(bool addMode);
+    void clearSelection();
+    void selectAllMinions();
+    void renderSelectionMarkers();
+    void renderSelectionBox();
 
     void initializeTileMap();
     void spawnMinion();
@@ -69,7 +78,17 @@ class Game {
     int maxMinions_ = 100;
     std::vector<sf::Vector2i> deployZone_;
     std::vector<Minion*> minions_;
+    std::vector<Minion*> selectedMinions_;
     float spawnCooldown_ = 0.f;
+    float spawnCooldownDuration_ = 0.28f;
+    float minionSelectRadius_ = 26.f;
+    float cameraFollowLerp_ = 10.f;
+    bool edgePanEnabled_ = true;
+    float edgePanSpeed_ = 1300.f;
+    int edgePanMarginPx_ = 24;
+    bool selectionDragging_ = false;
+    sf::Vector2f selectionDragStart_{0.f, 0.f};
+    sf::Vector2f selectionDragCurrent_{0.f, 0.f};
 
     GameState gameState_ = GameState::Ready;
     float gameTimer_ = 0.f;

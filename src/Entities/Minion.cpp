@@ -33,23 +33,27 @@ void Minion::update(float dt) {
         if (pathIndex_ >= path_.size())
             pathIndex_ = path_.size() - 1;
 
-        const sf::Vector2f target = path_[pathIndex_];
-        sf::Vector2f toTarget = target - getPosition();
-        const float lenSq = toTarget.x * toTarget.x + toTarget.y * toTarget.y;
-        if (lenSq > 0.f) {
+        // Skip waypoints already reached (first path node is often current tile center).
+        while (!path_.empty()) {
+            const sf::Vector2f target = path_[pathIndex_];
+            sf::Vector2f toTarget = target - getPosition();
+            const float lenSq = toTarget.x * toTarget.x + toTarget.y * toTarget.y;
             const float len = std::sqrt(lenSq);
-            if (len < ARRIVAL_THRESHOLD) {
+
+            if (len <= ARRIVAL_THRESHOLD) {
                 if (pathIndex_ + 1 < path_.size()) {
                     ++pathIndex_;
-                } else {
-                    path_.clear();
-                    setVelocity(sf::Vector2f(0.f, 0.f));
+                    continue;
                 }
-            } else {
-                sf::Vector2f dir = toTarget / len;
-                setVelocity(dir * speed_);
-                setPosition(getPosition() + getVelocity() * dt);
+                path_.clear();
+                setVelocity(sf::Vector2f(0.f, 0.f));
+                break;
             }
+
+            sf::Vector2f dir = toTarget / len;
+            setVelocity(dir * speed_);
+            setPosition(getPosition() + getVelocity() * dt);
+            break;
         }
     }
 

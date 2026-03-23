@@ -56,6 +56,7 @@ Game::Game()
 void Game::run() {
     while (window_.isOpen()) {
         float dt = clock_.restart().asSeconds();
+        dt = std::min(dt, 0.05f);
         processEvents();
         update(dt);
         render();
@@ -73,12 +74,29 @@ void Game::processEvents() {
                 const sf::Vector2i clickPos = sf::Mouse::getPosition(window_);
                 if (isMouseInMinimap(clickPos)) {
                     moveCameraToMinimapPosition(clickPos);
+                    continue;
                 }
+            }
+            if (mouse->button == sf::Mouse::Button::Left && gameState_ == GameState::Playing) {
+                beginSelectionDrag(sf::Mouse::getPosition(window_));
             }
             if (mouse->button == sf::Mouse::Button::Right && gameState_ == GameState::Playing) {
                 const sf::Vector2i pixel(sf::Mouse::getPosition(window_));
                 const sf::Vector2f world = window_.mapPixelToCoords(pixel, gameView_);
-                issueOrderToTile(tileMap_->worldToTile(world));
+                issueOrderToSelectionOrAll(tileMap_->worldToTile(world));
+            }
+        }
+        if (const auto *mouse = event->getIf<sf::Event::MouseMoved>()) {
+            if (selectionDragging_ && gameState_ == GameState::Playing) {
+                updateSelectionDrag(sf::Vector2i(mouse->position));
+            }
+        }
+        if (const auto *mouse = event->getIf<sf::Event::MouseButtonReleased>()) {
+            if (mouse->button == sf::Mouse::Button::Left && selectionDragging_ &&
+                gameState_ == GameState::Playing) {
+                const bool addMode = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                                     sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+                finalizeSelectionDrag(addMode);
             }
         }
         if (const auto *key = event->getIf<sf::Event::KeyPressed>()) {
@@ -105,6 +123,12 @@ void Game::processEvents() {
             if (key->code == sf::Keyboard::Key::O && gameState_ == GameState::Playing) {
                 orderMinionsToNearestUncapturedFlag();
             }
+            if (key->code == sf::Keyboard::Key::L && gameState_ == GameState::Playing) {
+                selectAllMinions();
+            }
+            if (key->code == sf::Keyboard::Key::Escape && gameState_ == GameState::Playing) {
+                clearSelection();
+            }
             if (key->code == sf::Keyboard::Key::M) {
                 minimapVisible_ = !minimapVisible_;
             }
@@ -120,12 +144,12 @@ void Game::processEvents() {
 
 void Game::update(float dt) {
     if (gameState_ == GameState::Ready) {
-        updateCamera();
+        updateCamera(dt);
         return;
     }
 
     if (gameState_ != GameState::Playing) {
-        updateCamera();
+        updateCamera(dt);
         return;
     }
 
@@ -141,7 +165,7 @@ void Game::update(float dt) {
         spawnCooldown_ -= dt;
         if (spawnCooldown_ <= 0.f) {
             spawnMinion();
-            spawnCooldown_ = 0.2f;
+            spawnCooldown_ = spawnCooldownDuration_;
         }
     } else {
         spawnCooldown_ = 0.f;
@@ -162,10 +186,10 @@ void Game::update(float dt) {
     }
 
     updateGameplay(dt);
-    updateCamera();
+    updateCamera(dt);
 }
 
-void Game::updateCamera() {
+void Game::updateCamera(float dt) {
     const float halfW = gameView_.getSize().x * 0.5f;
     const float halfH = gameView_.getSize().y * 0.5f;
     const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
@@ -178,13 +202,45 @@ void Game::updateCamera() {
         centre = gameView_.getCenter();
     }
 
+    if (edgePanEnabled_) {
+        const sf::Vector2i mouse = sf::Mouse::getPosition(window_);
+        const sf::Vector2u winSize = window_.getSize();
+        sf::Vector2f pan(0.f, 0.f);
+        bool didPan = false;
+
+        if (mouse.x <= edgePanMarginPx_) {
+            pan.x -= edgePanSpeed_ * dt;
+            didPan = true;
+        } else if (mouse.x >= static_cast<int>(winSize.x) - edgePanMarginPx_) {
+            pan.x += edgePanSpeed_ * dt;
+            didPan = true;
+        }
+        if (mouse.y <= edgePanMarginPx_) {
+            pan.y -= edgePanSpeed_ * dt;
+            didPan = true;
+        } else if (mouse.y >= static_cast<int>(winSize.y) - edgePanMarginPx_) {
+            pan.y += edgePanSpeed_ * dt;
+            didPan = true;
+        }
+
+        if (didPan) {
+            // Manual camera pan should override follow target.
+            setCameraTarget(nullptr);
+            centre = gameView_.getCenter() + pan;
+        }
+    }
+
     const float minX = (mapW >= gameView_.getSize().x) ? halfW : mapW * 0.5f;
     const float maxX = (mapW >= gameView_.getSize().x) ? (mapW - halfW) : mapW * 0.5f;
     const float minY = (mapH >= gameView_.getSize().y) ? halfH : mapH * 0.5f;
     const float maxY = (mapH >= gameView_.getSize().y) ? (mapH - halfH) : mapH * 0.5f;
     centre.x = std::clamp(centre.x, minX, maxX);
     centre.y = std::clamp(centre.y, minY, maxY);
-    gameView_.setCenter(centre);
+    const sf::Vector2f current = gameView_.getCenter();
+    const float alpha = std::clamp(cameraFollowLerp_ * (1.f / 60.f), 0.f, 1.f);
+    const sf::Vector2f blended(current.x + (centre.x - current.x) * alpha,
+                               current.y + (centre.y - current.y) * alpha);
+    gameView_.setCenter(blended);
 }
 
 void Game::render() {
@@ -199,6 +255,8 @@ void Game::render() {
     entityManager_.renderAllExcept(window_, commander_);
     if (commander_)
         commander_->render(window_);
+    renderSelectionMarkers();
+    renderSelectionBox();
 
     if (debugCollision_ && collisionSystem_) {
         collisionSystem_->drawDebug(window_);
@@ -376,6 +434,7 @@ void Game::initializeHud() {
 void Game::startMatch() {
     entityManager_.clear();
     minions_.clear();
+    selectedMinions_.clear();
     commander_ = nullptr;
     cameraTarget_ = nullptr;
     hasSpawnedMinion_ = false;
@@ -406,6 +465,33 @@ void Game::issueOrderToTile(const sf::Vector2i &targetTile) {
     }
 }
 
+void Game::issueOrderToSelectionOrAll(const sf::Vector2i &targetTile) {
+    if (!tileMap_)
+        return;
+    if (targetTile.x < 0 || targetTile.y < 0 ||
+        static_cast<unsigned int>(targetTile.x) >= tileMap_->getWidth() ||
+        static_cast<unsigned int>(targetTile.y) >= tileMap_->getHeight()) {
+        return;
+    }
+    if (!tileMap_->isPassable(static_cast<unsigned int>(targetTile.x),
+                              static_cast<unsigned int>(targetTile.y))) {
+        return;
+    }
+
+    auto issue = [&](Minion *m) {
+        if (m && m->isAlive())
+            m->setTarget(targetTile);
+    };
+
+    if (!selectedMinions_.empty()) {
+        for (Minion *m : selectedMinions_)
+            issue(m);
+    } else {
+        for (Minion *m : minions_)
+            issue(m);
+    }
+}
+
 sf::Vector2i Game::nearestUncapturedFlagForTile(const sf::Vector2i &from) const {
     sf::Vector2i best(-1, -1);
     float bestDistSq = std::numeric_limits<float>::max();
@@ -427,7 +513,9 @@ sf::Vector2i Game::nearestUncapturedFlagForTile(const sf::Vector2i &from) const 
 void Game::orderMinionsToNearestUncapturedFlag() {
     if (!tileMap_)
         return;
-    for (Minion *m : minions_) {
+    const bool useSelection = !selectedMinions_.empty();
+    const auto &source = useSelection ? selectedMinions_ : minions_;
+    for (Minion *m : source) {
         if (!m || !m->isAlive())
             continue;
         const sf::Vector2i from = tileMap_->worldToTile(m->getPosition());
@@ -441,6 +529,9 @@ void Game::refreshMinionList() {
     minions_.erase(
         std::remove_if(minions_.begin(), minions_.end(), [](Minion *m) { return !m || !m->isAlive(); }),
         minions_.end());
+    selectedMinions_.erase(std::remove_if(selectedMinions_.begin(), selectedMinions_.end(),
+                                          [](Minion *m) { return !m || !m->isAlive(); }),
+                           selectedMinions_.end());
 }
 
 void Game::updateGameplay(float dt) {
@@ -518,11 +609,13 @@ void Game::renderHud() {
     std::string lines = "State: " + stateText + "\nScore: " + std::to_string(static_cast<int>(score_)) +
                         "\nFlags: " + std::to_string(capturedFlags_) + "/" +
                         std::to_string(totalFlags_) + "\nTime Left: " +
-                        std::to_string(static_cast<int>(remaining)) + "s\n";
+                        std::to_string(static_cast<int>(remaining)) + "s\nSelected: " +
+                        std::to_string(selectedMinions_.size()) + "/" + std::to_string(minions_.size()) +
+                        "\n";
     if (gameState_ == GameState::Ready) {
-        lines += "Enter: Start  |  Space: Spawn  |  Right Click: Order";
+        lines += "Enter: Start";
     } else if (gameState_ == GameState::Playing) {
-        lines += "Space: Spawn  |  Right Click: Order  |  O: Auto-order to flags";
+        lines += "LClick/Drag: Select  Shift+Select: Add  L: All  Esc: Clear  Space: Spawn  RClick: Move  O: Auto-flag";
     } else {
         lines += "R: Restart";
     }
@@ -531,4 +624,118 @@ void Game::renderHud() {
     text.setPosition(sf::Vector2f(20.f, 18.f));
     text.setFillColor(sf::Color::White);
     window_.draw(text);
+}
+
+void Game::handleWorldLeftClick(sf::Vector2i pixel) {
+    if (!tileMap_)
+        return;
+    const sf::Vector2f world = window_.mapPixelToCoords(pixel, gameView_);
+    Minion *best = nullptr;
+    float bestDistSq = minionSelectRadius_ * minionSelectRadius_;
+    for (Minion *m : minions_) {
+        if (!m || !m->isAlive())
+            continue;
+        const sf::Vector2f d = m->getPosition() - world;
+        const float d2 = d.x * d.x + d.y * d.y;
+        if (d2 <= bestDistSq) {
+            bestDistSq = d2;
+            best = m;
+        }
+    }
+
+    const bool addMode = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                         sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+    if (!addMode)
+        selectedMinions_.clear();
+    if (!best)
+        return;
+
+    const auto it = std::find(selectedMinions_.begin(), selectedMinions_.end(), best);
+    if (it == selectedMinions_.end()) {
+        selectedMinions_.push_back(best);
+    } else if (addMode) {
+        selectedMinions_.erase(it);
+    }
+}
+
+void Game::beginSelectionDrag(sf::Vector2i pixel) {
+    selectionDragging_ = true;
+    selectionDragStart_ = window_.mapPixelToCoords(pixel, gameView_);
+    selectionDragCurrent_ = selectionDragStart_;
+}
+
+void Game::updateSelectionDrag(sf::Vector2i pixel) {
+    selectionDragCurrent_ = window_.mapPixelToCoords(pixel, gameView_);
+}
+
+void Game::finalizeSelectionDrag(bool addMode) {
+    selectionDragging_ = false;
+    const sf::Vector2f delta = selectionDragCurrent_ - selectionDragStart_;
+    const float dragDistSq = delta.x * delta.x + delta.y * delta.y;
+    if (dragDistSq < 100.f) {
+        handleWorldLeftClick(window_.mapCoordsToPixel(selectionDragCurrent_, gameView_));
+        return;
+    }
+
+    const float left = std::min(selectionDragStart_.x, selectionDragCurrent_.x);
+    const float right = std::max(selectionDragStart_.x, selectionDragCurrent_.x);
+    const float top = std::min(selectionDragStart_.y, selectionDragCurrent_.y);
+    const float bottom = std::max(selectionDragStart_.y, selectionDragCurrent_.y);
+
+    if (!addMode)
+        selectedMinions_.clear();
+
+    for (Minion *m : minions_) {
+        if (!m || !m->isAlive())
+            continue;
+        const sf::Vector2f pos = m->getPosition();
+        if (pos.x >= left && pos.x <= right && pos.y >= top && pos.y <= bottom) {
+            if (std::find(selectedMinions_.begin(), selectedMinions_.end(), m) ==
+                selectedMinions_.end()) {
+                selectedMinions_.push_back(m);
+            }
+        }
+    }
+}
+
+void Game::clearSelection() {
+    selectedMinions_.clear();
+}
+
+void Game::selectAllMinions() {
+    selectedMinions_.clear();
+    for (Minion *m : minions_) {
+        if (m && m->isAlive())
+            selectedMinions_.push_back(m);
+    }
+}
+
+void Game::renderSelectionMarkers() {
+    for (Minion *m : selectedMinions_) {
+        if (!m || !m->isAlive())
+            continue;
+        sf::CircleShape ring(16.f);
+        ring.setOrigin(sf::Vector2f(16.f, 16.f));
+        ring.setPosition(m->getPosition());
+        ring.setFillColor(sf::Color::Transparent);
+        ring.setOutlineThickness(2.f);
+        ring.setOutlineColor(sf::Color(80, 220, 255));
+        window_.draw(ring);
+    }
+}
+
+void Game::renderSelectionBox() {
+    if (!selectionDragging_)
+        return;
+    const float left = std::min(selectionDragStart_.x, selectionDragCurrent_.x);
+    const float top = std::min(selectionDragStart_.y, selectionDragCurrent_.y);
+    const float width = std::abs(selectionDragCurrent_.x - selectionDragStart_.x);
+    const float height = std::abs(selectionDragCurrent_.y - selectionDragStart_.y);
+
+    sf::RectangleShape rect(sf::Vector2f(width, height));
+    rect.setPosition(sf::Vector2f(left, top));
+    rect.setFillColor(sf::Color(80, 220, 255, 40));
+    rect.setOutlineThickness(1.5f);
+    rect.setOutlineColor(sf::Color(80, 220, 255, 180));
+    window_.draw(rect);
 }
