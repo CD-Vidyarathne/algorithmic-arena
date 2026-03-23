@@ -132,6 +132,9 @@ void Game::processEvents() {
             if (key->code == sf::Keyboard::Key::M) {
                 minimapVisible_ = !minimapVisible_;
             }
+            if (key->code == sf::Keyboard::Key::Z) {
+                showKeymapHud_ = !showKeymapHud_;
+            }
             if (key->code == sf::Keyboard::Key::F1) {
                 debugCollision_ = !debugCollision_;
             }
@@ -589,14 +592,6 @@ void Game::updateGameplay(float dt) {
 }
 
 void Game::renderHud() {
-    sf::RectangleShape bg(sf::Vector2f(460.f, 150.f));
-    bg.setPosition(sf::Vector2f(10.f, 10.f));
-    bg.setFillColor(sf::Color(0, 0, 0, 150));
-    window_.draw(bg);
-
-    if (!hudFontLoaded_)
-        return;
-
     std::string stateText = "READY";
     if (gameState_ == GameState::Playing)
         stateText = "PLAYING";
@@ -606,24 +601,52 @@ void Game::renderHud() {
         stateText = "GAME OVER";
 
     const float remaining = std::max(0.f, timeLimitSeconds_ - gameTimer_);
-    std::string lines = "State: " + stateText + "\nScore: " + std::to_string(static_cast<int>(score_)) +
-                        "\nFlags: " + std::to_string(capturedFlags_) + "/" +
-                        std::to_string(totalFlags_) + "\nTime Left: " +
-                        std::to_string(static_cast<int>(remaining)) + "s\nSelected: " +
-                        std::to_string(selectedMinions_.size()) + "/" + std::to_string(minions_.size()) +
-                        "\n";
+    const sf::Vector2u ws = window_.getSize();
+
+    // Top status bar for core match information.
+    sf::RectangleShape topBar(sf::Vector2f(static_cast<float>(ws.x), 40.f));
+    topBar.setPosition(sf::Vector2f(0.f, 0.f));
+    topBar.setFillColor(sf::Color(0, 0, 0, 170));
+    window_.draw(topBar);
+
+    if (!hudFontLoaded_)
+        return;
+
+    const std::string topLine =
+        "State: " + stateText + "    Time: " + std::to_string(static_cast<int>(remaining)) +
+        "s    Score: " + std::to_string(static_cast<int>(score_)) + "    Flags: " +
+        std::to_string(capturedFlags_) + "/" + std::to_string(totalFlags_) + "    Selected: " +
+        std::to_string(selectedMinions_.size()) + "/" + std::to_string(minions_.size());
+    sf::Text topText(hudFont_, topLine, 17);
+    topText.setPosition(sf::Vector2f(12.f, 9.f));
+    topText.setFillColor(sf::Color::White);
+    window_.draw(topText);
+
+    if (!showKeymapHud_)
+        return;
+
+    // Bottom-left keymap panel (toggle with Z).
+    sf::RectangleShape keymapBg(sf::Vector2f(560.f, 128.f));
+    keymapBg.setPosition(sf::Vector2f(12.f, static_cast<float>(ws.y) - 140.f));
+    keymapBg.setFillColor(sf::Color(0, 0, 0, 155));
+    window_.draw(keymapBg);
+
+    std::string keymapBody;
     if (gameState_ == GameState::Ready) {
-        lines += "Enter: Start";
+        keymapBody = "Enter: Start match";
     } else if (gameState_ == GameState::Playing) {
-        lines += "LClick/Drag: Select  Shift+Select: Add  L: All  Esc: Clear  Space: Spawn  RClick: Move  O: Auto-flag";
+        keymapBody =
+            "WASD: Move Commander | LClick/Drag: Select | Shift+Select: Add\n"
+            "RClick: Move selected (or all if none) | L: Select all | Esc: Clear\n"
+            "Space: Spawn | O: Auto-order flags | C: Follow commander | Z: Toggle this panel";
     } else {
-        lines += "R: Restart";
+        keymapBody = "R: Restart match | Z: Toggle controls panel";
     }
 
-    sf::Text text(hudFont_, lines, 18);
-    text.setPosition(sf::Vector2f(20.f, 18.f));
-    text.setFillColor(sf::Color::White);
-    window_.draw(text);
+    sf::Text keymapText(hudFont_, "Controls\n" + keymapBody, 15);
+    keymapText.setPosition(sf::Vector2f(24.f, static_cast<float>(ws.y) - 134.f));
+    keymapText.setFillColor(sf::Color(230, 230, 230));
+    window_.draw(keymapText);
 }
 
 void Game::handleWorldLeftClick(sf::Vector2i pixel) {

@@ -109,4 +109,5 @@ class Game {
 
     sf::Font hudFont_;
     bool hudFontLoaded_ = false;
+    bool showKeymapHud_ = true;
 };
