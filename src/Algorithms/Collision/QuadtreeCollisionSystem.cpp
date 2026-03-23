@@ -1,6 +1,8 @@
 #include "QuadtreeCollisionSystem.h"
 
 #include "../../Entities/Entity.h"
+#include "../../Entities/Minion.h"
+#include "../../Entities/PlayerCommander.h"
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <algorithm>
 
@@ -174,6 +176,14 @@ sf::FloatRect intersectRects(const sf::FloatRect& a, const sf::FloatRect& b) {
     return sf::FloatRect({left, top}, {right - left, bottom - top});
 }
 
+bool isCommanderMinionPair(const Entity& a, const Entity& b) {
+    const bool aCommander = dynamic_cast<const PlayerCommander*>(&a) != nullptr;
+    const bool bCommander = dynamic_cast<const PlayerCommander*>(&b) != nullptr;
+    const bool aMinion = dynamic_cast<const Minion*>(&a) != nullptr;
+    const bool bMinion = dynamic_cast<const Minion*>(&b) != nullptr;
+    return (aCommander && bMinion) || (bCommander && aMinion);
+}
+
 void resolveEntityOverlap(Entity& a, Entity& b) {
     sf::FloatRect boundsA = a.getBounds();
     sf::FloatRect boundsB = b.getBounds();
@@ -288,6 +298,8 @@ void QuadtreeCollisionSystem::update(EntityManager& entities, const TileMap& map
 
     for (auto [a, b] : pairs) {
         if (!a || !b || !a->isAlive() || !b->isAlive())
+            continue;
+        if (isCommanderMinionPair(*a, *b))
             continue;
         resolveEntityOverlap(*a, *b);
     }

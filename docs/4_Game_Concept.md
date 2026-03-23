@@ -15,7 +15,6 @@ Game World:
 
         Dynamic Obstacles: Moving blockades, environmental hazards (e.g., lava flows that appear/disappear on timers).
 
-        Opponent Minions (Optional, but adds dynamic collision): If you want to introduce a simple AI opponent that also controls minions, this significantly increases collision complexity. For simplicity, we'll assume neutral dynamic obstacles for now, or the player manages all minions against the environment.
 
 Player's Role (The Commander):
 
