@@ -8,14 +8,16 @@
 #include "Algorithms/Pathfinding/IPathfindingSystem.h"
 #include <SFML/Graphics.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 class Entity;
 class Minion;
 class PlayerCommander;
 
-enum class GameState { Playing, Won, Lost };
+enum class GameState { Ready, Playing, Won, Lost };
 
 class Game {
   public:
@@ -36,6 +38,14 @@ class Game {
     bool isMouseInMinimap(sf::Vector2i pixel) const;
     void moveCameraToMinimapPosition(sf::Vector2i pixel);
     void moveCameraToNextFlag();
+    void renderHud();
+    void initializeHud();
+    void startMatch();
+    void updateGameplay(float dt);
+    void issueOrderToTile(const sf::Vector2i& targetTile);
+    void orderMinionsToNearestUncapturedFlag();
+    sf::Vector2i nearestUncapturedFlagForTile(const sf::Vector2i& from) const;
+    void refreshMinionList();
 
     void initializeTileMap();
     void spawnMinion();
@@ -61,13 +71,23 @@ class Game {
     std::vector<Minion*> minions_;
     float spawnCooldown_ = 0.f;
 
-    GameState gameState_ = GameState::Playing;
+    GameState gameState_ = GameState::Ready;
     float gameTimer_ = 0.f;
     float timeLimitSeconds_ = 180.f;
     bool hasSpawnedMinion_ = false;
+    float score_ = 0.f;
+    int capturedFlags_ = 0;
+    int totalFlags_ = 0;
+    std::vector<uint8_t> flagCaptured_;
+    float scoreTickAccumulator_ = 0.f;
+    float initialSpawnGraceSeconds_ = 5.f;
+    float captureRatePerMinion_ = 0.33f;
 
     std::unique_ptr<ICollisionSystem> collisionSystem_;
     std::unique_ptr<IPathfindingSystem> pathfindingSystem_;
     bool debugCollision_ = false;
     bool debugPathfinding_ = false;
+
+    sf::Font hudFont_;
+    bool hudFontLoaded_ = false;
 };

@@ -12,6 +12,14 @@ class EntityManager {
         entities_.push_back(std::move(entity));
     }
 
+    void clear() {
+        entities_.clear();
+    }
+
+    std::size_t count() const {
+        return entities_.size();
+    }
+
     void removeDeadEntities() {
         entities_.erase(std::remove_if(entities_.begin(), entities_.end(),
                                        [](const auto &e) { return !e->isAlive(); }),
