@@ -17,13 +17,15 @@ float rectHeight(const sf::FloatRect& r) {
 struct Quadtree {
     sf::FloatRect bounds;
     int capacity;
+    int level;
     std::vector<Entity*> entities;
     std::unique_ptr<Quadtree> nw;
     std::unique_ptr<Quadtree> ne;
     std::unique_ptr<Quadtree> sw;
     std::unique_ptr<Quadtree> se;
 
-    explicit Quadtree(const sf::FloatRect& b, int cap = 4) : bounds(b), capacity(cap) {}
+    explicit Quadtree(const sf::FloatRect& b, int cap = 4, int lvl = 0)
+        : bounds(b), capacity(cap), level(lvl) {}
 
     bool isLeaf() const { return !nw && !ne && !sw && !se; }
 
@@ -42,15 +44,23 @@ struct Quadtree {
     }
 
     void subdivide() {
+        // Prevent pathological infinite subdivision on extremely small regions.
+        if (level >= 8)
+            return;
+
         const float x = bounds.position.x;
         const float y = bounds.position.y;
         const float w = rectWidth(bounds) * 0.5f;
         const float h = rectHeight(bounds) * 0.5f;
 
-        nw = std::make_unique<Quadtree>(sf::FloatRect({x, y}, {w, h}), capacity);
-        ne = std::make_unique<Quadtree>(sf::FloatRect({x + w, y}, {w, h}), capacity);
-        sw = std::make_unique<Quadtree>(sf::FloatRect({x, y + h}, {w, h}), capacity);
-        se = std::make_unique<Quadtree>(sf::FloatRect({x + w, y + h}, {w, h}), capacity);
+        // Do not subdivide degenerate rectangles.
+        if (w <= 1.f || h <= 1.f)
+            return;
+
+        nw = std::make_unique<Quadtree>(sf::FloatRect({x, y}, {w, h}), capacity, level + 1);
+        ne = std::make_unique<Quadtree>(sf::FloatRect({x + w, y}, {w, h}), capacity, level + 1);
+        sw = std::make_unique<Quadtree>(sf::FloatRect({x, y + h}, {w, h}), capacity, level + 1);
+        se = std::make_unique<Quadtree>(sf::FloatRect({x + w, y + h}, {w, h}), capacity, level + 1);
     }
 
     void insert(Entity* e) {
@@ -65,10 +75,18 @@ struct Quadtree {
 
         if (isLeaf()) {
             subdivide();
-            for (Entity* existing : entities) {
+            // If subdivision failed (due to max depth / degenerate size), keep entities here.
+            if (isLeaf()) {
+                entities.push_back(e);
+                return;
+            }
+ 
+            std::vector<Entity*> existingEntities = std::move(entities);
+            entities.clear();
+            entities.reserve(existingEntities.size());
+            for (Entity* existing : existingEntities) {
                 insertIntoChildren(existing);
             }
-            entities.clear();
         }
 
         insertIntoChildren(e);
@@ -127,7 +145,7 @@ std::unique_ptr<Quadtree> buildQuadtree(const TileMap& map, EntityManager& entit
     const float mapW = static_cast<float>(map.getWidth() * map.getTileSize());
     const float mapH = static_cast<float>(map.getHeight() * map.getTileSize());
     auto root = std::make_unique<Quadtree>(
-        sf::FloatRect({0.f, 0.f}, sf::Vector2f(mapW, mapH)), 4);
+        sf::FloatRect({0.f, 0.f}, sf::Vector2f(mapW, mapH)), 4, 0);
 
     for (auto& uptr : entities.getEntities()) {
         Entity* e = uptr.get();

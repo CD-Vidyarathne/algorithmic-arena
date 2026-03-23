@@ -45,6 +45,8 @@ add_executable(${PROJECT_NAME}
     src/World/MapLoader.cpp
     src/Algorithms/Collision/BruteForceCollisionSystem.cpp
     src/Algorithms/Collision/QuadtreeCollisionSystem.cpp
+    src/Algorithms/Pathfinding/DijkstrasPathfindingSystem.cpp
+    src/Algorithms/Pathfinding/AStarPathfindingSystem.cpp
 )
 
 # add_executable(${PROJECT_NAME} ${SOURCES})

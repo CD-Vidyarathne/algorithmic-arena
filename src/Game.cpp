@@ -1,6 +1,8 @@
 #include "Game.h"
 #include "Algorithms/Collision/BruteForceCollisionSystem.h"
 #include "Algorithms/Collision/QuadtreeCollisionSystem.h"
+#include "Algorithms/Pathfinding/AStarPathfindingSystem.h"
+#include "Algorithms/Pathfinding/DijkstrasPathfindingSystem.h"
 #include "Entities/Entity.h"
 #include "Entities/Minion.h"
 #include "Entities/PlayerCommander.h"
@@ -27,8 +29,10 @@ Game::Game()
 #endif
 
 #ifdef USE_ASTAR_PATHFINDING
+    pathfindingSystem_ = std::make_unique<AStarPathfindingSystem>();
     Logger::get()->info("Pathfinding algorithm: A* (USE_ASTAR_PATHFINDING)");
 #else
+    pathfindingSystem_ = std::make_unique<DijkstrasPathfindingSystem>();
     Logger::get()->info("Pathfinding algorithm: Dijkstra");
 #endif
 
@@ -82,6 +86,9 @@ void Game::processEvents() {
             }
             if (key->code == sf::Keyboard::Key::F1) {
                 debugCollision_ = !debugCollision_;
+            }
+            if (key->code == sf::Keyboard::Key::F2) {
+                debugPathfinding_ = !debugPathfinding_;
             }
         }
     }
@@ -162,6 +169,9 @@ void Game::render() {
 
     if (debugCollision_ && collisionSystem_) {
         collisionSystem_->drawDebug(window_);
+    }
+    if (debugPathfinding_ && pathfindingSystem_ && tileMap_) {
+        pathfindingSystem_->drawDebug(window_, *tileMap_);
     }
 
     window_.setView(window_.getDefaultView());
@@ -282,6 +292,16 @@ void Game::initializeTileMap() {
     commander_ = commander.get();
     setCameraTarget(commander_);
     entityManager_.addEntity(std::move(commander));
+
+    // Spawn a single Minion at the commander position for testing
+    if (pathfindingSystem_) {
+        const sf::Vector2i tile = tileMap_->worldToTile(commanderPos);
+        const sf::Vector2f spawnPos = tileMap_->tileCentre(tile);
+        auto minion = std::make_unique<Minion>(spawnPos, pathfindingSystem_.get(), tileMap_.get());
+        Minion *ptr = minion.get();
+        minions_.push_back(ptr);
+        entityManager_.addEntity(std::move(minion));
+    }
 }
 
 void Game::spawnMinion() {
@@ -300,7 +320,7 @@ void Game::spawnMinion() {
         return;
 
     const sf::Vector2f spawnPos = tileMap_->tileCentre(cmdTile);
-    auto minion = std::make_unique<Minion>(spawnPos);
+    auto minion = std::make_unique<Minion>(spawnPos, pathfindingSystem_.get(), tileMap_.get());
     Minion *ptr = minion.get();
     minions_.push_back(ptr);
     entityManager_.addEntity(std::move(minion));

@@ -1,14 +1,20 @@
 #include "Minion.h"
+
+#include "../Algorithms/Pathfinding/IPathfindingSystem.h"
+#include "../World/TileMap.h"
 #include "../Util/Logger.h"
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <cmath>
 
 namespace {
 const float MINION_DISPLAY_SIZE = 24.f;
+const float ARRIVAL_THRESHOLD = 4.f;
 }
 
-Minion::Minion(sf::Vector2f position)
-    : Entity(position, sf::Vector2f(20.f, 20.f), sf::Color::Cyan) {
+Minion::Minion(sf::Vector2f position, IPathfindingSystem *pathfindingSystem, const TileMap *tileMap)
+    : Entity(position, sf::Vector2f(20.f, 20.f), sf::Color::Cyan),
+      pathfindingSystem_(pathfindingSystem),
+      tileMap_(tileMap) {
     if (!texture_.loadFromFile("../assets/Characters/Minion/minion_up.png")) {
         Logger::get()->warn("Minion: could not load minion_up.png");
     } else {
@@ -23,9 +29,46 @@ Minion::Minion(sf::Vector2f position)
 }
 
 void Minion::update(float dt) {
-    (void)dt;
-    // No movement until pathfinding is wired
+    if (!path_.empty() && tileMap_) {
+        if (pathIndex_ >= path_.size())
+            pathIndex_ = path_.size() - 1;
+
+        const sf::Vector2f target = path_[pathIndex_];
+        sf::Vector2f toTarget = target - getPosition();
+        const float lenSq = toTarget.x * toTarget.x + toTarget.y * toTarget.y;
+        if (lenSq > 0.f) {
+            const float len = std::sqrt(lenSq);
+            if (len < ARRIVAL_THRESHOLD) {
+                if (pathIndex_ + 1 < path_.size()) {
+                    ++pathIndex_;
+                } else {
+                    path_.clear();
+                    setVelocity(sf::Vector2f(0.f, 0.f));
+                }
+            } else {
+                sf::Vector2f dir = toTarget / len;
+                setVelocity(dir * speed_);
+                setPosition(getPosition() + getVelocity() * dt);
+            }
+        }
+    }
+
     updateRotationFromVelocity();
+}
+
+void Minion::setTarget(const sf::Vector2i &targetTile) {
+    if (!pathfindingSystem_ || !tileMap_) {
+        Logger::get()->warn("Minion::setTarget called without pathfinding system or tileMap");
+        return;
+    }
+
+    const sf::Vector2i startTile = tileMap_->worldToTile(getPosition());
+    auto tiles = pathfindingSystem_->findPath(startTile, targetTile, *tileMap_);
+    path_.clear();
+    pathIndex_ = 0;
+    for (const auto &t : tiles) {
+        path_.push_back(tileMap_->tileCentre(t));
+    }
 }
 
 void Minion::updateRotationFromVelocity() {

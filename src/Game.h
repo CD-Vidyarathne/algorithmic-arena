@@ -5,6 +5,7 @@
 #include "World/TextureManager.h"
 #include "World/TileMap.h"
 #include "Algorithms/Collision/ICollisionSystem.h"
+#include "Algorithms/Pathfinding/IPathfindingSystem.h"
 #include <SFML/Graphics.hpp>
 #include <cstddef>
 #include <memory>
@@ -65,10 +66,8 @@ class Game {
     float timeLimitSeconds_ = 180.f;
     bool hasSpawnedMinion_ = false;
 
-    // UI font and end-game text will be wired in a later step.
-    // sf::Font uiFont_;
-    // sf::Text endText_;
-
     std::unique_ptr<ICollisionSystem> collisionSystem_;
+    std::unique_ptr<IPathfindingSystem> pathfindingSystem_;
     bool debugCollision_ = false;
+    bool debugPathfinding_ = false;
 };
