@@ -34,10 +34,26 @@ std::uint64_t tileKey(const sf::Vector2i &t) {
 }
 }  // namespace
 
-Game::Game()
-    : window_(sf::VideoMode(sf::Vector2u(WINDOW_WIDTH, WINDOW_HEIGHT)), "Algorithmic Arena") {
+Game::Game(GameOptions options)
+    : window_(sf::VideoMode(sf::Vector2u(WINDOW_WIDTH, WINDOW_HEIGHT)), "Algorithmic Arena"),
+      mapPath_(std::move(options.mapPath)) {
     Logger::get()->info("Game initialized");
-    window_.setFramerateLimit(60);
+    if (options.uncappedFps) {
+        window_.setFramerateLimit(0);
+        Logger::get()->info("Framerate cap disabled (--unlimited-fps) for benchmarking");
+    } else {
+        window_.setFramerateLimit(60);
+    }
+
+    if (options.benchmarkCsvPath) {
+        csvLogger_.emplace(*options.benchmarkCsvPath);
+        if (csvLogger_->isOpen()) {
+            Logger::get()->info("Benchmark CSV logging: {}", *options.benchmarkCsvPath);
+        } else {
+            Logger::get()->error("Failed to open benchmark CSV path: {}", *options.benchmarkCsvPath);
+            csvLogger_.reset();
+        }
+    }
 
 #ifdef USE_QUADTREE_COLLISION
     collisionSystem_ = std::make_unique<QuadtreeCollisionSystem>();
@@ -231,6 +247,19 @@ void Game::update(float dt) {
 
     updateGameplay(dt);
     updateCamera(dt);
+
+    if (csvLogger_ && csvLogger_->isOpen()) {
+        csvLogAccumulator_ += dt;
+        if (csvLogAccumulator_ >= 1.f) {
+            csvLogAccumulator_ -= 1.f;
+            const double collisionUs = static_cast<double>(lastCollisionMs_) * 1000.0;
+            const double pathfindingUs =
+                static_cast<double>(PathfindingPerf::lastFrameNanos()) / 1000.0;
+            csvLogger_->log(gameTimer_, smoothedFps_, static_cast<int>(entityManager_.count()),
+                            collisionUs, pathfindingUs, PathfindingPerf::lastFrameCalls(),
+                            static_cast<int>(minions_.size()));
+        }
+    }
 }
 
 void Game::updateCamera(float dt) {
@@ -461,7 +490,7 @@ void Game::moveCameraToNextFlag() {
 }
 
 void Game::initializeTileMap() {
-    auto data = MapLoader::load("../maps/nexus_siege_512.map");
+    auto data = MapLoader::load(mapPath_);
 
     maxMinions_ = data.minionCap > 0 ? data.minionCap : 100;
     timeLimitSeconds_ = data.timeLimitSeconds > 0 ? static_cast<float>(data.timeLimitSeconds) : 180.f;
@@ -613,6 +642,7 @@ void Game::startMatch() {
     capturedFlags_ = 0;
     scoreTickAccumulator_ = 0.f;
     spawnCooldown_ = 0.f;
+    csvLogAccumulator_ = 0.f;
     initializeTileMap();
     gameState_ = GameState::Playing;
 }

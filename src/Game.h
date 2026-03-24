@@ -6,11 +6,13 @@
 #include "World/TileMap.h"
 #include "Algorithms/Collision/ICollisionSystem.h"
 #include "Algorithms/Pathfinding/IPathfindingSystem.h"
+#include "Util/CsvLogger.h"
 #include <SFML/Graphics.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -21,9 +23,15 @@ class PlayerCommander;
 
 enum class GameState { Ready, Playing, Won, Lost };
 
+struct GameOptions {
+    std::optional<std::string> benchmarkCsvPath;
+    bool uncappedFps = false;
+    std::string mapPath = "../maps/nexus_siege_512.map";
+};
+
 class Game {
   public:
-    Game();
+    explicit Game(GameOptions options = {});
     void run();
 
     void setCameraTarget(Entity* entity) { cameraTarget_ = entity; }
@@ -128,4 +136,8 @@ class Game {
     sf::Font hudFont_;
     bool hudFontLoaded_ = false;
     bool showKeymapHud_ = true;
+
+    std::string mapPath_;
+    std::optional<CsvLogger> csvLogger_;
+    float csvLogAccumulator_ = 0.f;
 };
