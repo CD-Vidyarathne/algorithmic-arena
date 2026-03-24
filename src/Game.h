@@ -36,6 +36,7 @@ class Game {
     void render();
     void updateCamera(float dt);
     void renderMinimap();
+    void renderFlagCaptureOverlays();
     bool isMouseInMinimap(sf::Vector2i pixel) const;
     void moveCameraToMinimapPosition(sf::Vector2i pixel);
     void moveCameraToNextFlag();
@@ -111,7 +112,7 @@ class Game {
     std::vector<uint8_t> flagCaptured_;
     float scoreTickAccumulator_ = 0.f;
     float initialSpawnGraceSeconds_ = 5.f;
-    float captureRatePerMinion_ = 0.33f;
+    float captureRatePerMinion_ = 0.55f;
 
     std::unique_ptr<ICollisionSystem> collisionSystem_;
     std::unique_ptr<IPathfindingSystem> pathfindingSystem_;

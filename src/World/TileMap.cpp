@@ -163,6 +163,9 @@ void TileMap::advanceCapture(unsigned int x, unsigned int y, float dt, float rat
     }
 
     float value = captureProgress_[index];
+    if (value >= 1.0f)
+        return;
+
     value += dt * rate;
     value = std::clamp(value, 0.0f, 1.0f);
     captureProgress_[index] = value;

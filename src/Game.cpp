@@ -266,6 +266,9 @@ void Game::render() {
 
     if (tileMap_) {
         tileMap_->draw(window_);
+        if (gameState_ == GameState::Playing) {
+            renderFlagCaptureOverlays();
+        }
     }
 
     entityManager_.renderAllExcept(window_, commander_);
@@ -286,7 +289,9 @@ void Game::render() {
             }
         }
         if (pathSubject) {
-            const sf::Vector2i start = tileMap_->worldToTile(pathSubject->getPosition());
+            const sf::Vector2f centre =
+                pathSubject->getPosition() + pathSubject->getSize() * 0.5f;
+            const sf::Vector2i start = tileMap_->worldToTile(centre);
             const sf::Vector2i end = *pathSubject->getGoalTile();
             pathfindingSystem_->findPath(start, end, *tileMap_);
             pathfindingSystem_->drawDebug(window_, *tileMap_);
@@ -298,6 +303,53 @@ void Game::render() {
     if (minimapVisible_)
         renderMinimap();
     window_.display();
+}
+
+void Game::renderFlagCaptureOverlays() {
+    if (!tileMap_ || flagTilePositions_.empty())
+        return;
+
+    const unsigned int ts = tileMap_->getTileSize();
+    const float tsf = static_cast<float>(ts);
+
+    for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
+        const sf::Vector2i t = flagTilePositions_[i];
+        if (t.x < 0 || t.y < 0)
+            continue;
+        const unsigned int tx = static_cast<unsigned int>(t.x);
+        const unsigned int ty = static_cast<unsigned int>(t.y);
+        if (tx >= tileMap_->getWidth() || ty >= tileMap_->getHeight())
+            continue;
+
+        const sf::Vector2f worldTL = tileMap_->tileToWorld(t);
+        const bool secured = (i < flagCaptured_.size() && flagCaptured_[i] != 0u);
+
+        if (secured) {
+            sf::RectangleShape box(sf::Vector2f(tsf, tsf));
+            box.setPosition(worldTL);
+            box.setFillColor(sf::Color(255, 215, 60, 85));
+            box.setOutlineThickness(2.f);
+            box.setOutlineColor(sf::Color(255, 235, 140, 220));
+            window_.draw(box);
+            continue;
+        }
+
+        const float p = tileMap_->getCaptureProgress(tx, ty);
+        sf::RectangleShape frame(sf::Vector2f(tsf, tsf));
+        frame.setPosition(worldTL);
+        frame.setFillColor(sf::Color::Transparent);
+        frame.setOutlineThickness(1.5f);
+        frame.setOutlineColor(sf::Color(255, 240, 120, p > 0.01f ? 200 : 90));
+        window_.draw(frame);
+
+        if (p > 0.001f) {
+            const float h = tsf * p;
+            sf::RectangleShape fill(sf::Vector2f(tsf, h));
+            fill.setPosition(sf::Vector2f(worldTL.x, worldTL.y + tsf - h));
+            fill.setFillColor(sf::Color(40, 255, 120, 175));
+            window_.draw(fill);
+        }
+    }
 }
 
 void Game::renderMinimap() {
@@ -607,7 +659,8 @@ void Game::orderMinionsToNearestUncapturedFlag() {
     for (Minion *m : source) {
         if (!m || !m->isAlive())
             continue;
-        const sf::Vector2i from = tileMap_->worldToTile(m->getPosition());
+        const sf::Vector2f mc = m->getPosition() + m->getSize() * 0.5f;
+        const sf::Vector2i from = tileMap_->worldToTile(mc);
         const sf::Vector2i target = nearestUncapturedFlagForTile(from);
         if (target.x >= 0)
             m->setTarget(target);
@@ -638,7 +691,8 @@ void Game::updateGameplay(float dt) {
     for (Minion *m : minions_) {
         if (!m || !m->isAlive())
             continue;
-        const sf::Vector2i tile = tileMap_->worldToTile(m->getPosition());
+        const sf::Vector2f centre = m->getPosition() + m->getSize() * 0.5f;
+        const sf::Vector2i tile = tileMap_->worldToTile(centre);
         for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
             if (flagTilePositions_[i] == tile) {
                 minionsOnFlag[i] += 1;
@@ -698,10 +752,26 @@ void Game::renderHud() {
     if (!hudFontLoaded_)
         return;
 
+    float maxCapProgress = 0.f;
+    if (gameState_ == GameState::Playing && tileMap_) {
+        for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
+            if (i < flagCaptured_.size() && flagCaptured_[i] != 0u)
+                continue;
+            const sf::Vector2i &ft = flagTilePositions_[i];
+            if (ft.x < 0 || ft.y < 0)
+                continue;
+            maxCapProgress = std::max(
+                maxCapProgress,
+                tileMap_->getCaptureProgress(static_cast<unsigned int>(ft.x),
+                                            static_cast<unsigned int>(ft.y)));
+        }
+    }
+
     const std::string topLine =
         "State: " + stateText + "    Time: " + std::to_string(static_cast<int>(remaining)) +
         "s    Score: " + std::to_string(static_cast<int>(score_)) + "    Flags: " +
-        std::to_string(capturedFlags_) + "/" + std::to_string(totalFlags_) + "    Selected: " +
+        std::to_string(capturedFlags_) + "/" + std::to_string(totalFlags_) + "    Capturing: " +
+        std::to_string(static_cast<int>(maxCapProgress * 100.f)) + "%    Selected: " +
         std::to_string(selectedMinions_.size()) + "/" + std::to_string(minions_.size()) +
         "    Bulk: " + std::to_string(bulkSpawnAmount());
     sf::Text topText(hudFont_, topLine, 17);
@@ -720,7 +790,9 @@ void Game::renderHud() {
 
     std::string keymapBody;
     if (gameState_ == GameState::Ready) {
-        keymapBody = "Enter: Start match";
+        keymapBody =
+            "Enter: Start match\n"
+            "Stand on gold flag tiles with minions to capture; green fills the tile as progress";
     } else if (gameState_ == GameState::Playing) {
         keymapBody =
             "WASD: Move Commander | LClick/Drag: Select | Shift+Select: Add\n"
