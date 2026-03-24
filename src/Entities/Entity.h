@@ -50,6 +50,11 @@ class Entity {
         alive_ = false;
     }
 
+    /** If true, entity-vs-blocked-tile resolution is skipped (e.g. commander flies over obstacles). */
+    virtual bool ignoresMapCollision() const {
+        return false;
+    }
+
   private:
     sf::Vector2f position_;
     sf::Vector2f velocity_;

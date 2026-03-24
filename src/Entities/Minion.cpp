@@ -46,6 +46,8 @@ void Minion::update(float dt) {
                     continue;
                 }
                 path_.clear();
+                pathIndex_ = 0;
+                goalTile_.reset();
                 setVelocity(sf::Vector2f(0.f, 0.f));
                 break;
             }
@@ -65,6 +67,8 @@ void Minion::setTarget(const sf::Vector2i &targetTile) {
         Logger::get()->warn("Minion::setTarget called without pathfinding system or tileMap");
         return;
     }
+
+    goalTile_ = targetTile;
 
     const sf::Vector2i startTile = tileMap_->worldToTile(getPosition());
     auto tiles = pathfindingSystem_->findPath(startTile, targetTile, *tileMap_);

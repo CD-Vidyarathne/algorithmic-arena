@@ -16,6 +16,7 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <random>
 #include <string>
 
 const int WINDOW_WIDTH = 1280;
@@ -141,6 +142,18 @@ void Game::processEvents() {
             if (key->code == sf::Keyboard::Key::F2) {
                 debugPathfinding_ = !debugPathfinding_;
             }
+            if (gameState_ == GameState::Playing && tileMap_ && !deployZone_.empty()) {
+                if (key->code == sf::Keyboard::Key::LBracket) {
+                    bulkSpawnPresetIndex_ =
+                        (bulkSpawnPresetIndex_ + kBulkSpawnPresets.size() - 1) % kBulkSpawnPresets.size();
+                }
+                if (key->code == sf::Keyboard::Key::RBracket) {
+                    bulkSpawnPresetIndex_ = (bulkSpawnPresetIndex_ + 1) % kBulkSpawnPresets.size();
+                }
+                if (key->code == sf::Keyboard::Key::J) {
+                    spawnMinionsInDeployZone(bulkSpawnAmount());
+                }
+            }
         }
     }
 }
@@ -265,7 +278,19 @@ void Game::render() {
         collisionSystem_->drawDebug(window_);
     }
     if (debugPathfinding_ && pathfindingSystem_ && tileMap_) {
-        pathfindingSystem_->drawDebug(window_, *tileMap_);
+        Minion *pathSubject = nullptr;
+        for (Minion *m : selectedMinions_) {
+            if (m && m->isAlive() && m->getGoalTile().has_value()) {
+                pathSubject = m;
+                break;
+            }
+        }
+        if (pathSubject) {
+            const sf::Vector2i start = tileMap_->worldToTile(pathSubject->getPosition());
+            const sf::Vector2i end = *pathSubject->getGoalTile();
+            pathfindingSystem_->findPath(start, end, *tileMap_);
+            pathfindingSystem_->drawDebug(window_, *tileMap_);
+        }
     }
 
     window_.setView(window_.getDefaultView());
@@ -394,6 +419,20 @@ void Game::initializeTileMap() {
     minions_.clear();
 }
 
+namespace {
+constexpr int kBenchmarkMinionCap = 100000;
+}
+
+void Game::spawnMinionAtWorld(const sf::Vector2f &worldPos) {
+    if (!pathfindingSystem_ || !tileMap_)
+        return;
+    auto minion = std::make_unique<Minion>(worldPos, pathfindingSystem_.get(), tileMap_.get());
+    Minion *ptr = minion.get();
+    minions_.push_back(ptr);
+    hasSpawnedMinion_ = true;
+    entityManager_.addEntity(std::move(minion));
+}
+
 void Game::spawnMinion() {
     if (!commander_ || !tileMap_)
         return;
@@ -410,11 +449,58 @@ void Game::spawnMinion() {
         return;
 
     const sf::Vector2f spawnPos = tileMap_->tileCentre(cmdTile);
-    auto minion = std::make_unique<Minion>(spawnPos, pathfindingSystem_.get(), tileMap_.get());
-    Minion *ptr = minion.get();
-    minions_.push_back(ptr);
-    hasSpawnedMinion_ = true;
-    entityManager_.addEntity(std::move(minion));
+    spawnMinionAtWorld(spawnPos);
+}
+
+void Game::spawnMinionsInDeployZone(int count) {
+    if (!tileMap_ || deployZone_.empty() || count <= 0 || !pathfindingSystem_)
+        return;
+
+    const int cap = std::max(maxMinions_, kBenchmarkMinionCap);
+    const int room = cap - static_cast<int>(minions_.size());
+    const int toSpawn = std::min(count, room);
+    if (toSpawn <= 0) {
+        Logger::get()->warn("spawnMinionsInDeployZone: at cap ({} minions), skipping", minions_.size());
+        return;
+    }
+
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<std::size_t> tilePick(0, deployZone_.size() - 1);
+    const unsigned int ts = tileMap_->getTileSize();
+    const float halfW = 10.f;
+    const float margin = 1.f;
+    float jmax = (static_cast<float>(ts) * 0.5f) - halfW - margin;
+    if (jmax < 0.f)
+        jmax = 0.f;
+    std::uniform_real_distribution<float> jx(-jmax, jmax);
+    std::uniform_real_distribution<float> jy(-jmax, jmax);
+
+    for (int i = 0; i < toSpawn; ++i) {
+        const sf::Vector2i t = deployZone_[tilePick(rng)];
+        sf::Vector2f pos = tileMap_->tileCentre(t);
+        pos.x += jx(rng);
+        pos.y += jy(rng);
+
+        const float tsf = static_cast<float>(ts);
+        const float tileLeft = static_cast<float>(t.x) * tsf;
+        const float tileTop = static_cast<float>(t.y) * tsf;
+        const float minX = tileLeft + halfW + margin;
+        const float maxX = tileLeft + static_cast<float>(ts) - halfW - margin;
+        const float minY = tileTop + halfW + margin;
+        const float maxY = tileTop + static_cast<float>(ts) - halfW - margin;
+        if (minX <= maxX)
+            pos.x = std::clamp(pos.x, minX, maxX);
+        else
+            pos.x = tileMap_->tileCentre(t).x;
+        if (minY <= maxY)
+            pos.y = std::clamp(pos.y, minY, maxY);
+        else
+            pos.y = tileMap_->tileCentre(t).y;
+
+        spawnMinionAtWorld(pos);
+    }
+
+    Logger::get()->info("spawnMinionsInDeployZone: spawned {} minions (requested {})", toSpawn, count);
 }
 
 void Game::initializeHud() {
@@ -616,7 +702,8 @@ void Game::renderHud() {
         "State: " + stateText + "    Time: " + std::to_string(static_cast<int>(remaining)) +
         "s    Score: " + std::to_string(static_cast<int>(score_)) + "    Flags: " +
         std::to_string(capturedFlags_) + "/" + std::to_string(totalFlags_) + "    Selected: " +
-        std::to_string(selectedMinions_.size()) + "/" + std::to_string(minions_.size());
+        std::to_string(selectedMinions_.size()) + "/" + std::to_string(minions_.size()) +
+        "    Bulk: " + std::to_string(bulkSpawnAmount());
     sf::Text topText(hudFont_, topLine, 17);
     topText.setPosition(sf::Vector2f(12.f, 9.f));
     topText.setFillColor(sf::Color::White);
@@ -626,8 +713,8 @@ void Game::renderHud() {
         return;
 
     // Bottom-left keymap panel (toggle with Z).
-    sf::RectangleShape keymapBg(sf::Vector2f(560.f, 128.f));
-    keymapBg.setPosition(sf::Vector2f(12.f, static_cast<float>(ws.y) - 140.f));
+    sf::RectangleShape keymapBg(sf::Vector2f(580.f, 168.f));
+    keymapBg.setPosition(sf::Vector2f(12.f, static_cast<float>(ws.y) - 180.f));
     keymapBg.setFillColor(sf::Color(0, 0, 0, 155));
     window_.draw(keymapBg);
 
@@ -638,13 +725,15 @@ void Game::renderHud() {
         keymapBody =
             "WASD: Move Commander | LClick/Drag: Select | Shift+Select: Add\n"
             "RClick: Move selected (or all if none) | L: Select all | Esc: Clear\n"
-            "Space: Spawn | O: Auto-order flags | C: Follow commander | Z: Toggle this panel";
+            "Space: Spawn (deploy tile) | [ ]: Bulk count | J: Spawn bulk in deploy zone\n"
+            "O: Auto-order flags | C: Follow commander | F2: Path debug (select 1+ minion with goal)\n"
+            "Z: Toggle this panel";
     } else {
         keymapBody = "R: Restart match | Z: Toggle controls panel";
     }
 
     sf::Text keymapText(hudFont_, "Controls\n" + keymapBody, 15);
-    keymapText.setPosition(sf::Vector2f(24.f, static_cast<float>(ws.y) - 134.f));
+    keymapText.setPosition(sf::Vector2f(24.f, static_cast<float>(ws.y) - 174.f));
     keymapText.setFillColor(sf::Color(230, 230, 230));
     window_.draw(keymapText);
 }

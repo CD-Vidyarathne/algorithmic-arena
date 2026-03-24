@@ -20,6 +20,10 @@ class Minion : public Entity {
 
     void setTarget(const sf::Vector2i &targetTile);
 
+    const std::optional<sf::Vector2i> &getGoalTile() const {
+        return goalTile_;
+    }
+
   private:
     void updateRotationFromVelocity();
 
@@ -31,5 +35,6 @@ class Minion : public Entity {
     const TileMap *tileMap_ = nullptr;                // non-owning
     std::vector<sf::Vector2f> path_;
     std::size_t pathIndex_ = 0;
+    std::optional<sf::Vector2i> goalTile_;
     float speed_ = 80.f;
 };

@@ -12,6 +12,10 @@ class PlayerCommander : public Entity {
     void update(float dt) override;
     void render(sf::RenderWindow &window) override;
 
+    bool ignoresMapCollision() const override {
+        return true;
+    }
+
   private:
     void updateRotationFromVelocity();
 

@@ -159,6 +159,8 @@ void BruteForceCollisionSystem::update(EntityManager& entities, const TileMap& m
     for (auto& ptr : list) {
         if (!ptr || !ptr->isAlive())
             continue;
+        if (ptr->ignoresMapCollision())
+            continue;
         resolveEntityTileCollision(*ptr, map);
     }
 }

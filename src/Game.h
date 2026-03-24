@@ -7,6 +7,7 @@
 #include "Algorithms/Collision/ICollisionSystem.h"
 #include "Algorithms/Pathfinding/IPathfindingSystem.h"
 #include <SFML/Graphics.hpp>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -58,6 +59,16 @@ class Game {
 
     void initializeTileMap();
     void spawnMinion();
+    void spawnMinionAtWorld(const sf::Vector2f &worldPos);
+    void spawnMinionsInDeployZone(int count);
+
+    static constexpr std::array<int, 12> kBulkSpawnPresets{10,   25,   50,   100,  250,  500,
+                                                             1000, 2500, 5000, 10000, 25000, 50000};
+    std::size_t bulkSpawnPresetIndex_ = 6;
+
+    int bulkSpawnAmount() const {
+        return kBulkSpawnPresets[bulkSpawnPresetIndex_ % kBulkSpawnPresets.size()];
+    }
 
     sf::RenderWindow window_;
     std::unique_ptr<TextureManager> textureManager_;

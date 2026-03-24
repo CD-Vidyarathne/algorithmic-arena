@@ -308,6 +308,8 @@ void QuadtreeCollisionSystem::update(EntityManager& entities, const TileMap& map
         Entity* e = uptr.get();
         if (!e || !e->isAlive())
             continue;
+        if (e->ignoresMapCollision())
+            continue;
         resolveEntityTileCollision(*e, map);
     }
 
