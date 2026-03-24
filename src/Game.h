@@ -68,6 +68,7 @@ class Game {
     void selectAllMinions();
     void renderSelectionMarkers();
     void renderSelectionBox();
+    void renderPathDebugOverlay();
 
     void initializeTileMap();
     void spawnMinion();
@@ -112,6 +113,7 @@ class Game {
     bool edgePanEnabled_ = true;
     float edgePanSpeed_ = 1300.f;
     int edgePanMarginPx_ = 24;
+    float cameraViewScale_ = 1.f;
     bool selectionDragging_ = false;
     sf::Vector2f selectionDragStart_{0.f, 0.f};
     sf::Vector2f selectionDragCurrent_{0.f, 0.f};

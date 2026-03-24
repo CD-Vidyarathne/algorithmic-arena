@@ -26,20 +26,16 @@ PlayerCommander::PlayerCommander(sf::Vector2f position)
 void PlayerCommander::update(float dt) {
     sf::Vector2f direction(0.f, 0.f);
 
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W) ||
-        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
         direction.y -= 1.f;
     }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) ||
-        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
         direction.y += 1.f;
     }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A) ||
-        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
         direction.x -= 1.f;
     }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) ||
-        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
         direction.x += 1.f;
     }
 

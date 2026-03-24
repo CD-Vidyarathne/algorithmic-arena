@@ -27,6 +27,8 @@ const int WINDOW_HEIGHT = 720;
 
 namespace {
 constexpr int kBenchmarkMinionCap = 100000;
+constexpr float kCameraZoomMin = 0.35f;
+constexpr float kCameraZoomMax = 8.f;
 
 std::uint64_t tileKey(const sf::Vector2i &t) {
     return (std::uint64_t(static_cast<std::uint32_t>(t.x)) << 32) |
@@ -153,6 +155,14 @@ void Game::processEvents() {
                 finalizeSelectionDrag(addMode);
             }
         }
+        if (const auto *scroll = event->getIf<sf::Event::MouseWheelScrolled>()) {
+            if (scroll->delta > 0.f)
+                cameraViewScale_ =
+                    std::clamp(cameraViewScale_ * 0.92f, kCameraZoomMin, kCameraZoomMax);
+            else if (scroll->delta < 0.f)
+                cameraViewScale_ =
+                    std::clamp(cameraViewScale_ * 1.08f, kCameraZoomMin, kCameraZoomMax);
+        }
         if (const auto *key = event->getIf<sf::Event::KeyPressed>()) {
             if (key->code == sf::Keyboard::Key::Enter && gameState_ == GameState::Ready) {
                 startMatch();
@@ -199,6 +209,14 @@ void Game::processEvents() {
             }
             if (key->code == sf::Keyboard::Key::F3) {
                 showPerfOverlay_ = !showPerfOverlay_;
+            }
+            if (key->code == sf::Keyboard::Key::Equal || key->code == sf::Keyboard::Key::Add) {
+                cameraViewScale_ =
+                    std::clamp(cameraViewScale_ * 0.92f, kCameraZoomMin, kCameraZoomMax);
+            }
+            if (key->code == sf::Keyboard::Key::Hyphen || key->code == sf::Keyboard::Key::Subtract) {
+                cameraViewScale_ =
+                    std::clamp(cameraViewScale_ * 1.08f, kCameraZoomMin, kCameraZoomMax);
             }
             if (gameState_ == GameState::Playing && tileMap_ && !deployZone_.empty()) {
                 if (key->code == sf::Keyboard::Key::LBracket) {
@@ -268,6 +286,15 @@ void Game::update(float dt) {
 }
 
 void Game::updateCamera(float dt) {
+    if (!tileMap_) {
+        return;
+    }
+
+    cameraViewScale_ = std::clamp(cameraViewScale_, kCameraZoomMin, kCameraZoomMax);
+    const float vw = static_cast<float>(WINDOW_WIDTH) * cameraViewScale_;
+    const float vh = static_cast<float>(WINDOW_HEIGHT) * cameraViewScale_;
+    gameView_.setSize(sf::Vector2f(vw, vh));
+
     const float halfW = gameView_.getSize().x * 0.5f;
     const float halfH = gameView_.getSize().y * 0.5f;
     const float mapW = static_cast<float>(tileMap_->getWidth() * tileMap_->getTileSize());
@@ -308,6 +335,23 @@ void Game::updateCamera(float dt) {
         }
     }
 
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) ||
+        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) ||
+        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) ||
+        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
+        setCameraTarget(nullptr);
+        sf::Vector2f arrow(0.f, 0.f);
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+            arrow.x -= edgePanSpeed_ * dt;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+            arrow.x += edgePanSpeed_ * dt;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
+            arrow.y -= edgePanSpeed_ * dt;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
+            arrow.y += edgePanSpeed_ * dt;
+        centre = gameView_.getCenter() + arrow;
+    }
+
     const float minX = (mapW >= gameView_.getSize().x) ? halfW : mapW * 0.5f;
     const float maxX = (mapW >= gameView_.getSize().x) ? (mapW - halfW) : mapW * 0.5f;
     const float minY = (mapH >= gameView_.getSize().y) ? halfH : mapH * 0.5f;
@@ -342,23 +386,7 @@ void Game::render() {
     if (debugCollision_ && collisionSystem_) {
         collisionSystem_->drawDebug(window_);
     }
-    if (debugPathfinding_ && pathfindingSystem_ && tileMap_) {
-        Minion *pathSubject = nullptr;
-        for (Minion *m : selectedMinions_) {
-            if (m && m->isAlive() && m->getGoalTile().has_value()) {
-                pathSubject = m;
-                break;
-            }
-        }
-        if (pathSubject) {
-            const sf::Vector2f centre =
-                pathSubject->getPosition() + pathSubject->getSize() * 0.5f;
-            const sf::Vector2i start = tileMap_->worldToTile(centre);
-            const sf::Vector2i end = *pathSubject->getGoalTile();
-            pathfindingSystem_->findPath(start, end, *tileMap_);
-            pathfindingSystem_->drawDebug(window_, *tileMap_);
-        }
-    }
+    renderPathDebugOverlay();
 
     window_.setView(window_.getDefaultView());
     renderHud();
@@ -904,8 +932,8 @@ void Game::renderHud() {
         return;
 
     // Bottom-left keymap panel (toggle with Z).
-    sf::RectangleShape keymapBg(sf::Vector2f(580.f, 168.f));
-    keymapBg.setPosition(sf::Vector2f(12.f, static_cast<float>(ws.y) - 180.f));
+    sf::RectangleShape keymapBg(sf::Vector2f(600.f, 210.f));
+    keymapBg.setPosition(sf::Vector2f(12.f, static_cast<float>(ws.y) - 222.f));
     keymapBg.setFillColor(sf::Color(0, 0, 0, 155));
     window_.draw(keymapBg);
 
@@ -916,17 +944,19 @@ void Game::renderHud() {
             "Stand on gold flag tiles with minions to capture; green fills the tile as progress";
     } else if (gameState_ == GameState::Playing) {
         keymapBody =
-            "WASD: Move Commander | LClick/Drag: Select | Shift+Select: Add\n"
-            "RClick: Move selected (or all if none) | L: Select all | Esc: Clear\n"
-            "Space: Spawn (deploy tile) | [ ]: Bulk count | J: Spawn bulk in deploy zone\n"
-            " O: Auto-order flags | C: Follow commander | F2: Path debug | F3: Perf overlay\n"
-            " Z: Toggle this panel";
+            "WASD: Move Commander | Arrows: Pan camera | Mouse wheel / - +: Zoom\n"
+            "LClick/Drag: Select | Shift+Select: Add\n"
+            "RClick: Move order | L: Select all | Esc: Clear minion selection\n"
+            "Space: Spawn | [ ]: Bulk preset | J: Bulk spawn in deploy zone\n"
+            " O: Auto-order flags | F: Focus next flag | C: Camera follow commander\n"
+            " F2: Path debug (selected minion goal, else nearest minion to focused flag)\n"
+            " F3: Perf overlay | Z: Toggle this panel";
     } else {
         keymapBody = "R: Restart match | Z: Toggle controls panel";
     }
 
     sf::Text keymapText(hudFont_, "Controls\n" + keymapBody, 15);
-    keymapText.setPosition(sf::Vector2f(24.f, static_cast<float>(ws.y) - 174.f));
+    keymapText.setPosition(sf::Vector2f(24.f, static_cast<float>(ws.y) - 216.f));
     keymapText.setFillColor(sf::Color(230, 230, 230));
     window_.draw(keymapText);
 }
@@ -1043,4 +1073,62 @@ void Game::renderSelectionBox() {
     rect.setOutlineThickness(1.5f);
     rect.setOutlineColor(sf::Color(80, 220, 255, 180));
     window_.draw(rect);
+}
+
+void Game::renderPathDebugOverlay() {
+    if (!debugPathfinding_ || !pathfindingSystem_ || !tileMap_ || gameState_ != GameState::Playing)
+        return;
+
+    Minion *pathSubject = nullptr;
+    sf::Vector2i pathEndTile(0, 0);
+    bool haveEnd = false;
+
+    for (Minion *m : selectedMinions_) {
+        if (m && m->isAlive() && m->getGoalTile().has_value()) {
+            pathSubject = m;
+            pathEndTile = *m->getGoalTile();
+            haveEnd = true;
+            break;
+        }
+    }
+
+    if (!pathSubject && !flagTilePositions_.empty() && !minions_.empty()) {
+        const std::size_t fi = flagCycleIndex_ % flagTilePositions_.size();
+        const sf::Vector2i &ft = flagTilePositions_[fi];
+        if (ft.x >= 0 && ft.y >= 0 &&
+            static_cast<unsigned int>(ft.x) < tileMap_->getWidth() &&
+            static_cast<unsigned int>(ft.y) < tileMap_->getHeight()) {
+            const sf::Vector2f flagCentre = tileMap_->tileCentre(ft);
+            float bestD2 = std::numeric_limits<float>::infinity();
+            for (Minion *m : minions_) {
+                if (!m || !m->isAlive())
+                    continue;
+                const sf::Vector2f c = m->getPosition() + m->getSize() * 0.5f;
+                const float dx = c.x - flagCentre.x;
+                const float dy = c.y - flagCentre.y;
+                const float d2 = dx * dx + dy * dy;
+                if (d2 < bestD2) {
+                    bestD2 = d2;
+                    pathSubject = m;
+                }
+            }
+            if (pathSubject) {
+                pathEndTile = ft;
+                haveEnd = true;
+            }
+        }
+    }
+
+    if (!pathSubject || !haveEnd)
+        return;
+
+    const unsigned int ex = static_cast<unsigned int>(pathEndTile.x);
+    const unsigned int ey = static_cast<unsigned int>(pathEndTile.y);
+    if (!tileMap_->isPassable(ex, ey))
+        return;
+
+    const sf::Vector2f mc = pathSubject->getPosition() + pathSubject->getSize() * 0.5f;
+    const sf::Vector2i start = tileMap_->worldToTile(mc);
+    pathfindingSystem_->findPath(start, pathEndTile, *tileMap_);
+    pathfindingSystem_->drawDebug(window_, *tileMap_);
 }
