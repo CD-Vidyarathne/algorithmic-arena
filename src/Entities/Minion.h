@@ -20,6 +20,8 @@ class Minion : public Entity {
 
     void setTarget(const sf::Vector2i &targetTile);
 
+    void clearOrders();
+
     const std::optional<sf::Vector2i> &getGoalTile() const {
         return goalTile_;
     }

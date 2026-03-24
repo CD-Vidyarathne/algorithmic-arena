@@ -44,6 +44,7 @@ class Game {
     void initializeHud();
     void startMatch();
     void updateGameplay(float dt);
+    void retargetMinionsFromCapturedFlagGoals();
     void issueOrderToTile(const sf::Vector2i& targetTile);
     void issueOrderToSelectionOrAll(const sf::Vector2i& targetTile);
     void orderMinionsToNearestUncapturedFlag();

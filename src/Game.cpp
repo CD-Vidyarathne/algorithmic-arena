@@ -729,6 +729,39 @@ void Game::updateGameplay(float dt) {
     if (hasSpawnedMinion_ && gameTimer_ > initialSpawnGraceSeconds_ && minions_.empty()) {
         gameState_ = GameState::Lost;
     }
+
+    retargetMinionsFromCapturedFlagGoals();
+}
+
+void Game::retargetMinionsFromCapturedFlagGoals() {
+    if (!tileMap_)
+        return;
+
+    for (Minion *m : minions_) {
+        if (!m || !m->isAlive())
+            continue;
+        const std::optional<sf::Vector2i> &goal = m->getGoalTile();
+        if (!goal.has_value())
+            continue;
+
+        bool goalWasCapturedFlag = false;
+        for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
+            if (flagTilePositions_[i] == *goal && (i < flagCaptured_.size() && flagCaptured_[i] != 0u)) {
+                goalWasCapturedFlag = true;
+                break;
+            }
+        }
+        if (!goalWasCapturedFlag)
+            continue;
+
+        const sf::Vector2f mc = m->getPosition() + m->getSize() * 0.5f;
+        const sf::Vector2i from = tileMap_->worldToTile(mc);
+        const sf::Vector2i target = nearestUncapturedFlagForTile(from);
+        if (target.x >= 0)
+            m->setTarget(target);
+        else
+            m->clearOrders();
+    }
 }
 
 void Game::renderHud() {

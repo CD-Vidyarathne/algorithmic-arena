@@ -62,6 +62,13 @@ void Minion::update(float dt) {
     updateRotationFromVelocity();
 }
 
+void Minion::clearOrders() {
+    path_.clear();
+    pathIndex_ = 0;
+    goalTile_.reset();
+    setVelocity(sf::Vector2f(0.f, 0.f));
+}
+
 void Minion::setTarget(const sf::Vector2i &targetTile) {
     if (!pathfindingSystem_ || !tileMap_) {
         Logger::get()->warn("Minion::setTarget called without pathfinding system or tileMap");
@@ -70,7 +77,8 @@ void Minion::setTarget(const sf::Vector2i &targetTile) {
 
     goalTile_ = targetTile;
 
-    const sf::Vector2i startTile = tileMap_->worldToTile(getPosition());
+    const sf::Vector2i startTile =
+        tileMap_->worldToTile(getPosition() + getSize() * 0.5f);
     auto tiles = pathfindingSystem_->findPath(startTile, targetTile, *tileMap_);
     path_.clear();
     pathIndex_ = 0;
