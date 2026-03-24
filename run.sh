@@ -2,24 +2,71 @@
 
 set -e
 
-# Build from repo root, then run the game from build/ (so default ../maps/... paths work).
-# Examples:
-#   ./run.sh
-#   ./run.sh --csv /tmp/bench.csv
-#   ./run.sh --unlimited-fps --csv ../out/run1.csv
-#   ./run.sh --map ../maps/benchmark_open_512.map --unlimited-fps --csv ../out/open.csv
+# From repo root: configures build/, runs AlgorithmicArena. See ./run.sh --help
 
-if [ ! -d "build" ]; then
+USE_QUADTREE_COLLISION=ON
+USE_ASTAR_PATHFINDING=ON
+RUN_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      cat <<'EOF'
+Usage: ./run.sh [build options] [game options]
+
+Build options (CMake — rebuilds when changed):
+  --quadtree, --collision-quadtree   Quadtree collision (default)
+  --brute,   --collision-brute      Brute-force collision
+  --astar,   --path-astar            A* pathfinding (default)
+  --dijkstra, --path-dijkstra        Dijkstra pathfinding
+
+Game options (passed to AlgorithmicArena):
+  --csv <file>          Benchmark log
+  --unlimited-fps       Disable 60 FPS cap
+  --map <path>          Map file
+
+Examples:
+  ./run.sh --brute --dijkstra
+  ./run.sh --quadtree --astar --csv ../results/run1.csv
+EOF
+      exit 0
+      ;;
+    --collision-brute|--brute)
+      USE_QUADTREE_COLLISION=OFF
+      shift
+      ;;
+    --collision-quadtree|--quadtree)
+      USE_QUADTREE_COLLISION=ON
+      shift
+      ;;
+    --path-dijkstra|--dijkstra)
+      USE_ASTAR_PATHFINDING=OFF
+      shift
+      ;;
+    --path-astar|--astar)
+      USE_ASTAR_PATHFINDING=ON
+      shift
+      ;;
+    *)
+      RUN_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ! -d build ]]; then
   mkdir build
 fi
 
 cd build
 
-echo "--- Configuring ---"
-cmake .. -DCMAKE_BUILD_TYPE=Release
+echo "--- Configuring (USE_QUADTREE_COLLISION=${USE_QUADTREE_COLLISION} USE_ASTAR_PATHFINDING=${USE_ASTAR_PATHFINDING}) ---"
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+  -DUSE_QUADTREE_COLLISION="${USE_QUADTREE_COLLISION}" \
+  -DUSE_ASTAR_PATHFINDING="${USE_ASTAR_PATHFINDING}"
 
 echo "--- Building ---"
-cmake --build . -j$(nproc)
+cmake --build . -j"$(nproc)"
 
 echo "--- Running Game ---"
-exec ./AlgorithmicArena "$@"
+exec ./AlgorithmicArena "${RUN_ARGS[@]}"
