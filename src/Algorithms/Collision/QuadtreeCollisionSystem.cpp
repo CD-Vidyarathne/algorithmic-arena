@@ -1,8 +1,6 @@
 #include "QuadtreeCollisionSystem.h"
 
 #include "../../Entities/Entity.h"
-#include "../../Entities/Minion.h"
-#include "../../Entities/PlayerCommander.h"
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <algorithm>
 
@@ -46,8 +44,8 @@ struct Quadtree {
     }
 
     void subdivide() {
-        // Prevent pathological infinite subdivision on extremely small regions.
-        if (level >= 8)
+        // Allow deeper trees on large maps so crowded clusters do not collapse into O(n^2) leaves.
+        if (level >= 14)
             return;
 
         const float x = bounds.position.x;
@@ -158,10 +156,6 @@ std::unique_ptr<Quadtree> buildQuadtree(const TileMap& map, EntityManager& entit
     return root;
 }
 
-float clampf(float v, float lo, float hi) {
-    return std::max(lo, std::min(v, hi));
-}
-
 sf::FloatRect intersectRects(const sf::FloatRect& a, const sf::FloatRect& b) {
     const float left = std::max(a.position.x, b.position.x);
     const float top = std::max(a.position.y, b.position.y);
@@ -177,11 +171,10 @@ sf::FloatRect intersectRects(const sf::FloatRect& a, const sf::FloatRect& b) {
 }
 
 bool isCommanderMinionPair(const Entity& a, const Entity& b) {
-    const bool aCommander = dynamic_cast<const PlayerCommander*>(&a) != nullptr;
-    const bool bCommander = dynamic_cast<const PlayerCommander*>(&b) != nullptr;
-    const bool aMinion = dynamic_cast<const Minion*>(&a) != nullptr;
-    const bool bMinion = dynamic_cast<const Minion*>(&b) != nullptr;
-    return (aCommander && bMinion) || (bCommander && aMinion);
+    const EntityKind ka = a.kind();
+    const EntityKind kb = b.kind();
+    return (ka == EntityKind::Commander && kb == EntityKind::Minion) ||
+           (kb == EntityKind::Commander && ka == EntityKind::Minion);
 }
 
 void resolveEntityOverlap(Entity& a, Entity& b) {
@@ -293,7 +286,10 @@ void QuadtreeCollisionSystem::update(EntityManager& entities, const TileMap& map
     auto tree = buildQuadtree(map, entities);
 
     std::vector<std::pair<Entity*, Entity*>> pairs;
-    pairs.reserve(128);
+    const std::size_t n = entities.getEntities().size();
+    const std::size_t estPairs = (n > 2000) ? (n * 8) : (n * 32 + 128);
+    pairs.reserve(std::min<std::size_t>(estPairs, n * (n - 1) / 2 + 1));
+
     tree->gatherPairs(pairs);
 
     for (auto [a, b] : pairs) {

@@ -3,6 +3,15 @@
 #include "../../Entities/Entity.h"
 
 namespace {
+bool isCommanderMinionPair(const Entity& a, const Entity& b) {
+    const EntityKind ka = a.kind();
+    const EntityKind kb = b.kind();
+    return (ka == EntityKind::Commander && kb == EntityKind::Minion) ||
+           (kb == EntityKind::Commander && ka == EntityKind::Minion);
+}
+}  // namespace
+
+namespace {
 
 float rectWidth(const sf::FloatRect& r) {
     return r.size.x;
@@ -148,6 +157,9 @@ void BruteForceCollisionSystem::update(EntityManager& entities, const TileMap& m
                          boundsB.position.y + rectHeight(boundsB));
 
             if (interRight <= interLeft || interBottom <= interTop)
+                continue;
+
+            if (isCommanderMinionPair(*a, *b))
                 continue;
 
             const sf::FloatRect intersection({interLeft, interTop},

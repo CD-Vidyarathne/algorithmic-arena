@@ -1,6 +1,7 @@
 #include "DijkstrasPathfindingSystem.h"
 
 #include "../../Util/Logger.h"
+#include "../../Util/PathfindingPerf.h"
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <climits>
 #include <unordered_set>
@@ -38,8 +39,18 @@ std::vector<sf::Vector2i> reconstructPath(
 }
 } // namespace
 
+void DijkstrasPathfindingSystem::setRecordSearchVisualization(bool enabled) {
+    recordSearchVisualization_ = enabled;
+    if (!recordSearchVisualization_) {
+        lastClosedSet_.clear();
+        lastOpenSet_.clear();
+        lastPath_.clear();
+    }
+}
+
 std::vector<sf::Vector2i>
 DijkstrasPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const TileMap &map) {
+    PathfindingPerf::FindPathScope perfScope;
     lastClosedSet_.clear();
     lastOpenSet_.clear();
     lastPath_.clear();
@@ -51,7 +62,7 @@ DijkstrasPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const
 
     if (!map.isPassable(static_cast<unsigned int>(end.x),
                         static_cast<unsigned int>(end.y))) {
-        Logger::get()->info("Dijkstra: target tile not passable");
+        Logger::get()->debug("Dijkstra: target tile not passable");
         return {};
     }
 
@@ -78,7 +89,9 @@ DijkstrasPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const
         if (closed.contains(current.pos))
             continue;
         closed.insert(current.pos);
-        lastClosedSet_.push_back(current.pos);
+        if (recordSearchVisualization_) {
+            lastClosedSet_.push_back(current.pos);
+        }
 
         if (current.pos == end) {
             lastPath_ = reconstructPath(end, cameFrom);
@@ -113,11 +126,13 @@ DijkstrasPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const
             neighbourNode.fCost = tentativeG; // Dijkstra: no heuristic
             neighbourNode.parent = current.pos;
             open.push(neighbourNode);
-            lastOpenSet_.push_back(next);
+            if (recordSearchVisualization_) {
+                lastOpenSet_.push_back(next);
+            }
         }
     }
 
-    Logger::get()->info("Dijkstra: no path found");
+    Logger::get()->debug("Dijkstra: no path found");
     return {};
 }
 

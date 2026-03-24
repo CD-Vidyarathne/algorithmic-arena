@@ -1,6 +1,7 @@
 #include "AStarPathfindingSystem.h"
 
 #include "../../Util/Logger.h"
+#include "../../Util/PathfindingPerf.h"
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <climits>
 #include <unordered_map>
@@ -39,12 +40,22 @@ std::vector<sf::Vector2i> reconstructPath(
 }
 } // namespace
 
+void AStarPathfindingSystem::setRecordSearchVisualization(bool enabled) {
+    recordSearchVisualization_ = enabled;
+    if (!recordSearchVisualization_) {
+        lastClosedSet_.clear();
+        lastOpenSet_.clear();
+        lastPath_.clear();
+    }
+}
+
 int AStarPathfindingSystem::heuristic(const sf::Vector2i &a, const sf::Vector2i &b) const {
     return std::abs(a.x - b.x) + std::abs(a.y - b.y);
 }
 
 std::vector<sf::Vector2i>
 AStarPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const TileMap &map) {
+    PathfindingPerf::FindPathScope perfScope;
     lastClosedSet_.clear();
     lastOpenSet_.clear();
     lastPath_.clear();
@@ -56,7 +67,7 @@ AStarPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const Til
 
     if (!map.isPassable(static_cast<unsigned int>(end.x),
                         static_cast<unsigned int>(end.y))) {
-        Logger::get()->info("A*: target tile not passable");
+        Logger::get()->debug("A*: target tile not passable");
         return {};
     }
 
@@ -83,7 +94,9 @@ AStarPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const Til
         if (closed.contains(current.pos))
             continue;
         closed.insert(current.pos);
-        lastClosedSet_.push_back(current.pos);
+        if (recordSearchVisualization_) {
+            lastClosedSet_.push_back(current.pos);
+        }
 
         if (current.pos == end) {
             lastPath_ = reconstructPath(end, cameFrom);
@@ -118,11 +131,13 @@ AStarPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const Til
             neighbourNode.fCost = tentativeG + heuristic(next, end);
             neighbourNode.parent = current.pos;
             open.push(neighbourNode);
-            lastOpenSet_.push_back(next);
+            if (recordSearchVisualization_) {
+                lastOpenSet_.push_back(next);
+            }
         }
     }
 
-    Logger::get()->info("A*: no path found");
+    Logger::get()->debug("A*: no path found");
     return {};
 }
 

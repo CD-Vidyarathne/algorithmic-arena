@@ -2,7 +2,6 @@
 
 #include "Entity.h"
 #include <SFML/Graphics/Sprite.hpp>
-#include <SFML/Graphics/Texture.hpp>
 #include <optional>
 #include <vector>
 
@@ -26,10 +25,13 @@ class Minion : public Entity {
         return goalTile_;
     }
 
+    EntityKind kind() const override {
+        return EntityKind::Minion;
+    }
+
   private:
     void updateRotationFromVelocity();
 
-    sf::Texture texture_;
     std::optional<sf::Sprite> sprite_;
     float lastAngleDeg_ = 0.f;
 

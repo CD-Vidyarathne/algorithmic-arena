@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Entity;
@@ -83,6 +84,7 @@ class Game {
     sf::FloatRect minimapPixelBounds_;  // updated each frame in renderMinimap for exact hit test
     bool minimapVisible_ = false;  // default off, toggle with M
     std::vector<sf::Vector2i> flagTilePositions_;
+    std::unordered_map<std::uint64_t, std::size_t> flagTileToIndex_;
     size_t flagCycleIndex_ = 0;
 
     Entity* cameraTarget_ = nullptr;
@@ -119,6 +121,9 @@ class Game {
     std::unique_ptr<IPathfindingSystem> pathfindingSystem_;
     bool debugCollision_ = false;
     bool debugPathfinding_ = false;
+    bool showPerfOverlay_ = true;
+    float smoothedFps_ = 0.f;
+    float lastCollisionMs_ = 0.f;
 
     sf::Font hudFont_;
     bool hudFontLoaded_ = false;

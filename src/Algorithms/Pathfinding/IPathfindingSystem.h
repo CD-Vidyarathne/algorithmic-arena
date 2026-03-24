@@ -16,5 +16,9 @@ class IPathfindingSystem {
 
    
     virtual void drawDebug(sf::RenderWindow &window, const TileMap &map) = 0;
+
+    virtual void setRecordSearchVisualization(bool enabled) {
+        (void)enabled;
+    }
 };
 

@@ -4,22 +4,35 @@
 #include "../World/TileMap.h"
 #include "../Util/Logger.h"
 #include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/Texture.hpp>
 #include <cmath>
 
 namespace {
 const float MINION_DISPLAY_SIZE = 24.f;
 const float ARRIVAL_THRESHOLD = 4.f;
+
+const sf::Texture *sharedMinionTexture() {
+    static sf::Texture tex;
+    static bool loaded = false;
+    if (!loaded) {
+        loaded = true;
+        if (!tex.loadFromFile("../assets/Characters/Minion/minion_up.png")) {
+            Logger::get()->warn("Minion: could not load minion_up.png (shared texture)");
+            return nullptr;
+        }
+    }
+    return &tex;
 }
+}  // namespace
 
 Minion::Minion(sf::Vector2f position, IPathfindingSystem *pathfindingSystem, const TileMap *tileMap)
     : Entity(position, sf::Vector2f(20.f, 20.f), sf::Color::Cyan),
       pathfindingSystem_(pathfindingSystem),
       tileMap_(tileMap) {
-    if (!texture_.loadFromFile("../assets/Characters/Minion/minion_up.png")) {
-        Logger::get()->warn("Minion: could not load minion_up.png");
-    } else {
-        sprite_.emplace(texture_);
-        const sf::Vector2u texSize = texture_.getSize();
+    const sf::Texture *tex = sharedMinionTexture();
+    if (tex) {
+        sprite_.emplace(*tex);
+        const sf::Vector2u texSize = tex->getSize();
         sprite_->setOrigin(sf::Vector2f(static_cast<float>(texSize.x) * 0.5f,
                                         static_cast<float>(texSize.y) * 0.5f));
         const float scaleX = MINION_DISPLAY_SIZE / static_cast<float>(texSize.x);

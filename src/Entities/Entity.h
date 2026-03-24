@@ -4,6 +4,8 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Vector2.hpp>
 
+enum class EntityKind { Generic, Commander, Minion };
+
 class Entity {
   public:
     explicit Entity(sf::Vector2f position, sf::Vector2f size, sf::Color color)
@@ -53,6 +55,10 @@ class Entity {
     /** If true, entity-vs-blocked-tile resolution is skipped (e.g. commander flies over obstacles). */
     virtual bool ignoresMapCollision() const {
         return false;
+    }
+
+    virtual EntityKind kind() const {
+        return EntityKind::Generic;
     }
 
   private:

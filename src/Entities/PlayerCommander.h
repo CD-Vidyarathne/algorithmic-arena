@@ -16,6 +16,10 @@ class PlayerCommander : public Entity {
         return true;
     }
 
+    EntityKind kind() const override {
+        return EntityKind::Commander;
+    }
+
   private:
     void updateRotationFromVelocity();
 

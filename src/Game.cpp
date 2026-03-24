@@ -7,6 +7,9 @@
 #include "Entities/Minion.h"
 #include "Entities/PlayerCommander.h"
 #include "Util/Logger.h"
+#include "Util/PathfindingPerf.h"
+
+#include <chrono>
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/Text.hpp>
@@ -21,6 +24,15 @@
 
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
+
+namespace {
+constexpr int kBenchmarkMinionCap = 100000;
+
+std::uint64_t tileKey(const sf::Vector2i &t) {
+    return (std::uint64_t(static_cast<std::uint32_t>(t.x)) << 32) |
+           std::uint64_t(static_cast<std::uint32_t>(t.y));
+}
+}  // namespace
 
 Game::Game()
     : window_(sf::VideoMode(sf::Vector2u(WINDOW_WIDTH, WINDOW_HEIGHT)), "Algorithmic Arena") {
@@ -42,6 +54,7 @@ Game::Game()
     pathfindingSystem_ = std::make_unique<DijkstrasPathfindingSystem>();
     Logger::get()->info("Pathfinding algorithm: Dijkstra");
 #endif
+    pathfindingSystem_->setRecordSearchVisualization(false);
 
     initializeTileMap();
     initializeHud();
@@ -56,8 +69,14 @@ Game::Game()
 
 void Game::run() {
     while (window_.isOpen()) {
+        PathfindingPerf::beginFrame();
         float dt = clock_.restart().asSeconds();
         dt = std::min(dt, 0.05f);
+        if (dt > 1e-6f) {
+            const float instFps = 1.f / dt;
+            smoothedFps_ =
+                (smoothedFps_ <= 0.f) ? instFps : (smoothedFps_ * 0.92f + instFps * 0.08f);
+        }
         processEvents();
         update(dt);
         render();
@@ -141,6 +160,11 @@ void Game::processEvents() {
             }
             if (key->code == sf::Keyboard::Key::F2) {
                 debugPathfinding_ = !debugPathfinding_;
+                if (pathfindingSystem_)
+                    pathfindingSystem_->setRecordSearchVisualization(debugPathfinding_);
+            }
+            if (key->code == sf::Keyboard::Key::F3) {
+                showPerfOverlay_ = !showPerfOverlay_;
             }
             if (gameState_ == GameState::Playing && tileMap_ && !deployZone_.empty()) {
                 if (key->code == sf::Keyboard::Key::LBracket) {
@@ -171,7 +195,11 @@ void Game::update(float dt) {
 
     entityManager_.updateAll(dt);
     if (collisionSystem_ && tileMap_) {
+        using clock = std::chrono::steady_clock;
+        const clock::time_point c0 = clock::now();
         collisionSystem_->update(entityManager_, *tileMap_);
+        lastCollisionMs_ =
+            std::chrono::duration<float, std::milli>(clock::now() - c0).count();
     }
     entityManager_.removeDeadEntities();
 
@@ -441,6 +469,11 @@ void Game::initializeTileMap() {
     flagTilePositions_ = data.flagTiles;
     totalFlags_ = static_cast<int>(flagTilePositions_.size());
     flagCaptured_.assign(flagTilePositions_.size(), 0u);
+    flagTileToIndex_.clear();
+    flagTileToIndex_.reserve(flagTilePositions_.size());
+    for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
+        flagTileToIndex_[tileKey(flagTilePositions_[i])] = i;
+    }
 
     textureManager_ = std::make_unique<TextureManager>();
     if (!textureManager_->loadFromPath("../assets")) {
@@ -469,10 +502,6 @@ void Game::initializeTileMap() {
     entityManager_.addEntity(std::move(commander));
 
     minions_.clear();
-}
-
-namespace {
-constexpr int kBenchmarkMinionCap = 100000;
 }
 
 void Game::spawnMinionAtWorld(const sf::Vector2f &worldPos) {
@@ -693,11 +722,9 @@ void Game::updateGameplay(float dt) {
             continue;
         const sf::Vector2f centre = m->getPosition() + m->getSize() * 0.5f;
         const sf::Vector2i tile = tileMap_->worldToTile(centre);
-        for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
-            if (flagTilePositions_[i] == tile) {
-                minionsOnFlag[i] += 1;
-                break;
-            }
+        const auto itFlag = flagTileToIndex_.find(tileKey(tile));
+        if (itFlag != flagTileToIndex_.end()) {
+            minionsOnFlag[itFlag->second] += 1;
         }
     }
 
@@ -745,11 +772,10 @@ void Game::retargetMinionsFromCapturedFlagGoals() {
             continue;
 
         bool goalWasCapturedFlag = false;
-        for (std::size_t i = 0; i < flagTilePositions_.size(); ++i) {
-            if (flagTilePositions_[i] == *goal && (i < flagCaptured_.size() && flagCaptured_[i] != 0u)) {
-                goalWasCapturedFlag = true;
-                break;
-            }
+        const auto itGoal = flagTileToIndex_.find(tileKey(*goal));
+        if (itGoal != flagTileToIndex_.end()) {
+            const std::size_t idx = itGoal->second;
+            goalWasCapturedFlag = (idx < flagCaptured_.size() && flagCaptured_[idx] != 0u);
         }
         if (!goalWasCapturedFlag)
             continue;
@@ -812,6 +838,35 @@ void Game::renderHud() {
     topText.setFillColor(sf::Color::White);
     window_.draw(topText);
 
+    if (showPerfOverlay_ && hudFontLoaded_) {
+        const float pathMs =
+            static_cast<float>(PathfindingPerf::lastFrameNanos()) / 1.e6f;
+        const int pathCalls = PathfindingPerf::lastFrameCalls();
+        const std::size_t liveEntities = entityManager_.count();
+
+        std::string collisionMode = "collision: brute";
+#ifdef USE_QUADTREE_COLLISION
+        collisionMode = "collision: quadtree";
+#endif
+        std::string pathMode = "path: Dijkstra";
+#ifdef USE_ASTAR_PATHFINDING
+        pathMode = "path: A*";
+#endif
+
+        const std::string perfLine =
+            "Perf (F3)  FPS~ " + std::to_string(static_cast<int>(smoothedFps_ + 0.5f)) +
+            "    entities " + std::to_string(liveEntities) + "  minions " +
+            std::to_string(minions_.size()) + "\n" + collisionMode + " | " + pathMode +
+            "    collision " + std::to_string(static_cast<int>(lastCollisionMs_ * 100.f) / 100.f) +
+            " ms    pathfind " + std::to_string(static_cast<int>(pathMs * 100.f) / 100.f) + " ms (" +
+            std::to_string(pathCalls) + " calls)";
+        sf::Text perfText(hudFont_, perfLine, 15);
+        perfText.setPosition(
+            sf::Vector2f(12.f, static_cast<float>(ws.y) - (showKeymapHud_ ? 250.f : 72.f)));
+        perfText.setFillColor(sf::Color(200, 255, 200));
+        window_.draw(perfText);
+    }
+
     if (!showKeymapHud_)
         return;
 
@@ -831,8 +886,8 @@ void Game::renderHud() {
             "WASD: Move Commander | LClick/Drag: Select | Shift+Select: Add\n"
             "RClick: Move selected (or all if none) | L: Select all | Esc: Clear\n"
             "Space: Spawn (deploy tile) | [ ]: Bulk count | J: Spawn bulk in deploy zone\n"
-            "O: Auto-order flags | C: Follow commander | F2: Path debug (select 1+ minion with goal)\n"
-            "Z: Toggle this panel";
+            " O: Auto-order flags | C: Follow commander | F2: Path debug | F3: Perf overlay\n"
+            " Z: Toggle this panel";
     } else {
         keymapBody = "R: Restart match | Z: Toggle controls panel";
     }
