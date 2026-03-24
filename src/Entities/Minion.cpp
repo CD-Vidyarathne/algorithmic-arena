@@ -1,6 +1,7 @@
 #include "Minion.h"
 
 #include "../Algorithms/Pathfinding/IPathfindingSystem.h"
+#include "../Util/PathfindBudget.h"
 #include "../World/TileMap.h"
 #include "../Util/Logger.h"
 #include <SFML/Graphics/RenderWindow.hpp>
@@ -25,10 +26,12 @@ const sf::Texture *sharedMinionTexture() {
 }
 }  // namespace
 
-Minion::Minion(sf::Vector2f position, IPathfindingSystem *pathfindingSystem, const TileMap *tileMap)
+Minion::Minion(sf::Vector2f position, IPathfindingSystem *pathfindingSystem, const TileMap *tileMap,
+               PathfindBudget *pathfindBudget)
     : Entity(position, sf::Vector2f(20.f, 20.f), sf::Color::Cyan),
       pathfindingSystem_(pathfindingSystem),
-      tileMap_(tileMap) {
+      tileMap_(tileMap),
+      pathfindBudget_(pathfindBudget) {
     const sf::Texture *tex = sharedMinionTexture();
     if (tex) {
         sprite_.emplace(*tex);
@@ -42,6 +45,9 @@ Minion::Minion(sf::Vector2f position, IPathfindingSystem *pathfindingSystem, con
 }
 
 void Minion::update(float dt) {
+    if (pendingPath_)
+        tryComputePath();
+
     if (!path_.empty() && tileMap_) {
         if (pathIndex_ >= path_.size())
             pathIndex_ = path_.size() - 1;
@@ -79,7 +85,33 @@ void Minion::clearOrders() {
     path_.clear();
     pathIndex_ = 0;
     goalTile_.reset();
+    pendingPath_ = false;
     setVelocity(sf::Vector2f(0.f, 0.f));
+}
+
+void Minion::tryComputePath() {
+    if (!pathfindingSystem_ || !tileMap_ || !goalTile_.has_value()) {
+        pendingPath_ = false;
+        return;
+    }
+
+    if (pathfindBudget_ && pathfindBudget_->remaining <= 0) {
+        pendingPath_ = true;
+        return;
+    }
+
+    if (pathfindBudget_)
+        pathfindBudget_->remaining -= 1;
+
+    pendingPath_ = false;
+    const sf::Vector2i startTile =
+        tileMap_->worldToTile(getPosition() + getSize() * 0.5f);
+    auto tiles = pathfindingSystem_->findPath(startTile, *goalTile_, *tileMap_);
+    path_.clear();
+    pathIndex_ = 0;
+    for (const auto &t : tiles) {
+        path_.push_back(tileMap_->tileCentre(t));
+    }
 }
 
 void Minion::setTarget(const sf::Vector2i &targetTile) {
@@ -89,15 +121,10 @@ void Minion::setTarget(const sf::Vector2i &targetTile) {
     }
 
     goalTile_ = targetTile;
-
-    const sf::Vector2i startTile =
-        tileMap_->worldToTile(getPosition() + getSize() * 0.5f);
-    auto tiles = pathfindingSystem_->findPath(startTile, targetTile, *tileMap_);
     path_.clear();
     pathIndex_ = 0;
-    for (const auto &t : tiles) {
-        path_.push_back(tileMap_->tileCentre(t));
-    }
+    setVelocity(sf::Vector2f(0.f, 0.f));
+    tryComputePath();
 }
 
 void Minion::updateRotationFromVelocity() {

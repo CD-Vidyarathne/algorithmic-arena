@@ -118,6 +118,7 @@ Nested loop: for each minion, scan the full `flagTilePositions_` list.
 | Clustered collision hotspots | Shallow quadtree, casting, small reserves | Deeper tree, `EntityKind`, better reserve; brute-force skip |
 | Many minions on objectives | Flag scans per minion | `flagTileToIndex_` map |
 | CSV path columns always 0 | Last-frame snapshot + rare `findPath` | Per-second summed metrics after full frame |
+| Multi-second hitches with crowds | Thousands of `findPath` in one frame | `PathfindBudget` + pending paths across frames |
 
 ---
 
@@ -136,6 +137,26 @@ Benchmark CSV rows had `pathfinding_us` and `path_calls` always 0 even though mi
 
 - Log **sums over each ~1 second interval**: collision μs, pathfinding μs, and path call counts accumulated over all frames in that window, sampled **after `render()`** so work triggered in `processEvents`, `update`, or path-debug (`F2`) is included.
 - CSV header columns renamed to `collision_us_sum_1s`, `pathfinding_us_sum_1s`, `path_calls_sum_1s` so reports do not confuse them with single-frame values.
+
+---
+
+## 6. Long freezes / “stuck” game with hundreds of minions after bulk order or flag capture
+
+### Symptom
+
+With ~1000 units, the window stops responding for seconds; CSV shows enormous `pathfinding_us_sum_1s` (multi‑second CPU) in a single row.
+
+### Root cause
+
+Every `Minion::setTarget` runs a full grid search (`findPath`) on the main thread. Events such as **right‑click move to all**, **J bulk spawn + order**, or **`retargetMinionsFromCapturedFlagGoals`** after a flag is captured can trigger **hundreds or thousands of searches in one frame** on a 512×512 map, which blocks input and rendering.
+
+### Solution
+
+- Introduce a per‑frame **`PathfindBudget`** (default **64** searches per frame, see `Game::kPathfindsPerFrameBudget`).
+- `Game::run` refills the budget at the start of each frame; `Minion` defers overflow with `pendingPath_` and drains pending work across subsequent `update` ticks.
+- New orders may spread across many frames instead of one; the game stays responsive.
+
+**Files:** `src/Util/PathfindBudget.h`, `src/Entities/Minion.*`, `src/Game.h`, `src/Game.cpp`.
 
 ---
 

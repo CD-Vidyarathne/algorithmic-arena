@@ -7,6 +7,7 @@
 #include "Algorithms/Collision/ICollisionSystem.h"
 #include "Algorithms/Pathfinding/IPathfindingSystem.h"
 #include "Util/CsvLogger.h"
+#include "Util/PathfindBudget.h"
 #include <SFML/Graphics.hpp>
 #include <array>
 #include <cstddef>
@@ -81,6 +82,8 @@ class Game {
         return kBulkSpawnPresets[bulkSpawnPresetIndex_ % kBulkSpawnPresets.size()];
     }
 
+    static constexpr int kPathfindsPerFrameBudget = 64;
+
     sf::RenderWindow window_;
     std::unique_ptr<TextureManager> textureManager_;
     std::unique_ptr<TileMap> tileMap_;
@@ -127,6 +130,7 @@ class Game {
 
     std::unique_ptr<ICollisionSystem> collisionSystem_;
     std::unique_ptr<IPathfindingSystem> pathfindingSystem_;
+    PathfindBudget pathfindBudget_;
     bool debugCollision_ = false;
     bool debugPathfinding_ = false;
     bool showPerfOverlay_ = true;

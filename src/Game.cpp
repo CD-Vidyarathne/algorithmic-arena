@@ -93,6 +93,7 @@ void Game::run() {
             smoothedFps_ =
                 (smoothedFps_ <= 0.f) ? instFps : (smoothedFps_ * 0.92f + instFps * 0.08f);
         }
+        pathfindBudget_.remaining = kPathfindsPerFrameBudget;
         processEvents();
         update(dt);
         render();
@@ -540,7 +541,8 @@ void Game::initializeTileMap() {
 void Game::spawnMinionAtWorld(const sf::Vector2f &worldPos) {
     if (!pathfindingSystem_ || !tileMap_)
         return;
-    auto minion = std::make_unique<Minion>(worldPos, pathfindingSystem_.get(), tileMap_.get());
+    auto minion = std::make_unique<Minion>(worldPos, pathfindingSystem_.get(), tileMap_.get(),
+                                           &pathfindBudget_);
     Minion *ptr = minion.get();
     minions_.push_back(ptr);
     hasSpawnedMinion_ = true;
