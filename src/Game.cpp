@@ -498,7 +498,6 @@ void Game::initializeTileMap() {
     auto data = MapLoader::load(mapPath_);
 
     maxMinions_ = data.minionCap > 0 ? data.minionCap : 100;
-    timeLimitSeconds_ = data.timeLimitSeconds > 0 ? static_cast<float>(data.timeLimitSeconds) : 180.f;
     deployZone_ = data.deployZone;
     flagTilePositions_ = data.flagTiles;
     totalFlags_ = static_cast<int>(flagTilePositions_.size());
@@ -788,10 +787,6 @@ void Game::updateGameplay(float dt) {
         gameState_ = GameState::Won;
         return;
     }
-    if (gameTimer_ >= timeLimitSeconds_) {
-        gameState_ = GameState::Lost;
-        return;
-    }
     if (hasSpawnedMinion_ && gameTimer_ > initialSpawnGraceSeconds_ && minions_.empty()) {
         gameState_ = GameState::Lost;
     }
@@ -838,7 +833,6 @@ void Game::renderHud() {
     else if (gameState_ == GameState::Lost)
         stateText = "GAME OVER";
 
-    const float remaining = std::max(0.f, timeLimitSeconds_ - gameTimer_);
     const sf::Vector2u ws = window_.getSize();
 
     // Top status bar for core match information.
@@ -866,7 +860,7 @@ void Game::renderHud() {
     }
 
     const std::string topLine =
-        "State: " + stateText + "    Time: " + std::to_string(static_cast<int>(remaining)) +
+        "State: " + stateText + "    Elapsed: " + std::to_string(static_cast<int>(gameTimer_)) +
         "s    Score: " + std::to_string(static_cast<int>(score_)) + "    Flags: " +
         std::to_string(capturedFlags_) + "/" + std::to_string(totalFlags_) + "    Capturing: " +
         std::to_string(static_cast<int>(maxCapProgress * 100.f)) + "%    Selected: " +

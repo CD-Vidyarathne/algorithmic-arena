@@ -118,7 +118,6 @@ class Game {
 
     GameState gameState_ = GameState::Ready;
     float gameTimer_ = 0.f;
-    float timeLimitSeconds_ = 180.f;
     bool hasSpawnedMinion_ = false;
     float score_ = 0.f;
     int capturedFlags_ = 0;
