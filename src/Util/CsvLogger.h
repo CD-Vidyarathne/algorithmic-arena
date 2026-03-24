@@ -1,12 +1,19 @@
 #pragma once
 
+#include <filesystem>
 #include <fstream>
 #include <string>
+#include <system_error>
 
 class CsvLogger {
   public:
-    explicit CsvLogger(const std::string &filename)
-        : file_(filename, std::ios::out | std::ios::trunc) {
+    explicit CsvLogger(const std::string &filename) {
+        const std::filesystem::path p(filename);
+        if (p.has_parent_path()) {
+            std::error_code ec;
+            std::filesystem::create_directories(p.parent_path(), ec);
+        }
+        file_.open(filename, std::ios::out | std::ios::trunc);
         if (file_)
             file_ << "timestamp_s,fps,entity_count,collision_us,pathfinding_us,path_calls,minion_count\n";
     }
