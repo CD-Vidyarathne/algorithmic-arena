@@ -15,7 +15,8 @@ class CsvLogger {
         }
         file_.open(filename, std::ios::out | std::ios::trunc);
         if (file_)
-            file_ << "timestamp_s,fps,entity_count,collision_us,pathfinding_us,path_calls,minion_count\n";
+            file_ << "timestamp_s,fps,entity_count,collision_us_sum_1s,pathfinding_us_sum_1s,"
+                     "path_calls_sum_1s,minion_count\n";
     }
 
     bool isOpen() const { return file_.is_open(); }

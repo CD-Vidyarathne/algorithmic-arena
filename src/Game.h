@@ -140,4 +140,7 @@ class Game {
     std::string mapPath_;
     std::optional<CsvLogger> csvLogger_;
     float csvLogAccumulator_ = 0.f;
+    double benchCollisionUsAccum_ = 0.;
+    std::int64_t benchPathNanoAccum_ = 0;
+    int benchPathCallsAccum_ = 0;
 };

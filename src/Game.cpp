@@ -96,6 +96,23 @@ void Game::run() {
         processEvents();
         update(dt);
         render();
+
+        if (gameState_ == GameState::Playing && csvLogger_ && csvLogger_->isOpen()) {
+            benchCollisionUsAccum_ += static_cast<double>(lastCollisionMs_) * 1000.0;
+            benchPathNanoAccum_ += PathfindingPerf::lastFrameNanos();
+            benchPathCallsAccum_ += PathfindingPerf::lastFrameCalls();
+            csvLogAccumulator_ += dt;
+            if (csvLogAccumulator_ >= 1.f) {
+                csvLogAccumulator_ -= 1.f;
+                const double pathUs = static_cast<double>(benchPathNanoAccum_) / 1000.0;
+                csvLogger_->log(gameTimer_, smoothedFps_, static_cast<int>(entityManager_.count()),
+                                benchCollisionUsAccum_, pathUs, benchPathCallsAccum_,
+                                static_cast<int>(minions_.size()));
+                benchCollisionUsAccum_ = 0.;
+                benchPathNanoAccum_ = 0;
+                benchPathCallsAccum_ = 0;
+            }
+        }
     }
 }
 
@@ -247,19 +264,6 @@ void Game::update(float dt) {
 
     updateGameplay(dt);
     updateCamera(dt);
-
-    if (csvLogger_ && csvLogger_->isOpen()) {
-        csvLogAccumulator_ += dt;
-        if (csvLogAccumulator_ >= 1.f) {
-            csvLogAccumulator_ -= 1.f;
-            const double collisionUs = static_cast<double>(lastCollisionMs_) * 1000.0;
-            const double pathfindingUs =
-                static_cast<double>(PathfindingPerf::lastFrameNanos()) / 1000.0;
-            csvLogger_->log(gameTimer_, smoothedFps_, static_cast<int>(entityManager_.count()),
-                            collisionUs, pathfindingUs, PathfindingPerf::lastFrameCalls(),
-                            static_cast<int>(minions_.size()));
-        }
-    }
 }
 
 void Game::updateCamera(float dt) {
@@ -643,6 +647,9 @@ void Game::startMatch() {
     scoreTickAccumulator_ = 0.f;
     spawnCooldown_ = 0.f;
     csvLogAccumulator_ = 0.f;
+    benchCollisionUsAccum_ = 0.;
+    benchPathNanoAccum_ = 0;
+    benchPathCallsAccum_ = 0;
     initializeTileMap();
     gameState_ = GameState::Playing;
 }

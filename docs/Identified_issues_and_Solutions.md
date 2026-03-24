@@ -117,11 +117,30 @@ Nested loop: for each minion, scan the full `flagTilePositions_` list.
 | Degradation after pathfinding | Unbounded debug vectors + log noise | Gate viz behind F2; debug logs; perf counters |
 | Clustered collision hotspots | Shallow quadtree, casting, small reserves | Deeper tree, `EntityKind`, better reserve; brute-force skip |
 | Many minions on objectives | Flag scans per minion | `flagTileToIndex_` map |
+| CSV path columns always 0 | Last-frame snapshot + rare `findPath` | Per-second summed metrics after full frame |
+
+---
+
+## 5. CSV shows `pathfinding_us` / `path_calls` as zero while minions still move
+
+### Symptom
+
+Benchmark CSV rows had `pathfinding_us` and `path_calls` always 0 even though minions followed routes correctly.
+
+### Root causes
+
+1. **`findPath` is not called every frame** — after `setTarget`, the minion stores world waypoints and only **steers** in `Minion::update`. Weeks of steady movement can pass with **no new search**, so many frames legitimately do no pathfinding.
+2. **CSV sampled last frame only** — each row logged instantaneous `PathfindingPerf` for a single frame. Unless that frame happened to issue orders or retargets, the snapshot was always zero.
+
+### Solution
+
+- Log **sums over each ~1 second interval**: collision μs, pathfinding μs, and path call counts accumulated over all frames in that window, sampled **after `render()`** so work triggered in `processEvents`, `update`, or path-debug (`F2`) is included.
+- CSV header columns renamed to `collision_us_sum_1s`, `pathfinding_us_sum_1s`, `path_calls_sum_1s` so reports do not confuse them with single-frame values.
 
 ---
 
 ## Maintenance notes
 
-- Turning **F2** on intentionally re-enables heavy recording for path visualization; keep it off for benchmarks and large crowds unless you need the visualization.
+- Turning **F2** on intentionally re-enables heavy recording for path visualization; keep it off for benchmarks and large crowds unless you need the visualization. With **F2 on**, CSV path sums also include the extra `findPath` invoked for debug drawing each frame.
 - If new entity types need special collision pairing, extend `EntityKind` (or a similar discriminator) instead of adding hot-path RTTI.
 - When adding new bulk-spawned drawable agents, **share** assets (textures, fonts) or load them once at startup rather than per instance.
