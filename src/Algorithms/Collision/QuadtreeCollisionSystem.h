@@ -5,6 +5,6 @@
 class QuadtreeCollisionSystem : public ICollisionSystem {
   public:
     void update(EntityManager& entities, const TileMap& map) override;
-    void drawDebug(sf::RenderWindow& window) override;
+    void drawDebug(sf::RenderWindow& window, EntityManager& entities) override;
 };
 

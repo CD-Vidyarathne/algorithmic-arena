@@ -1,6 +1,7 @@
 #include "BruteForceCollisionSystem.h"
 
 #include "../../Entities/Entity.h"
+#include <SFML/Graphics/RectangleShape.hpp>
 
 namespace {
 bool isCommanderMinionPair(const Entity& a, const Entity& b) {
@@ -177,8 +178,20 @@ void BruteForceCollisionSystem::update(EntityManager& entities, const TileMap& m
     }
 }
 
-void BruteForceCollisionSystem::drawDebug(sf::RenderWindow& window) {
-    // This simple implementation leaves debug drawing to the Game for now.
-    (void)window;
+void BruteForceCollisionSystem::drawDebug(sf::RenderWindow& window, EntityManager& entities) {
+    sf::RectangleShape rect;
+    rect.setFillColor(sf::Color::Transparent);
+    rect.setOutlineThickness(1.f);
+    rect.setOutlineColor(sf::Color::Green);
+
+    for (auto& uptr : entities.getEntities()) {
+        Entity* e = uptr.get();
+        if (!e || !e->isAlive())
+            continue;
+        const sf::FloatRect b = e->getBounds();
+        rect.setPosition(b.position);
+        rect.setSize(b.size);
+        window.draw(rect);
+    }
 }
 

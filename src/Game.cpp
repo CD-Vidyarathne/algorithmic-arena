@@ -384,7 +384,7 @@ void Game::render() {
     renderSelectionBox();
 
     if (debugCollision_ && collisionSystem_) {
-        collisionSystem_->drawDebug(window_);
+        collisionSystem_->drawDebug(window_, entityManager_);
     }
     renderPathDebugOverlay();
 

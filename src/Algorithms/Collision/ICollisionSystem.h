@@ -9,6 +9,6 @@ class ICollisionSystem {
     virtual ~ICollisionSystem() = default;
     
     virtual void update(EntityManager& entities, const TileMap& map) = 0;
-    virtual void drawDebug(sf::RenderWindow& window) = 0;
+    virtual void drawDebug(sf::RenderWindow& window, EntityManager& entities) = 0;
 };
 

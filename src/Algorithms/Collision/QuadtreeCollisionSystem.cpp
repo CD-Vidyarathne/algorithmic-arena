@@ -312,9 +312,22 @@ void QuadtreeCollisionSystem::update(EntityManager& entities, const TileMap& map
     g_lastTree = std::move(tree);
 }
 
-void QuadtreeCollisionSystem::drawDebug(sf::RenderWindow& window) {
-    if (!g_lastTree)
-        return;
-    g_lastTree->draw(window);
+void QuadtreeCollisionSystem::drawDebug(sf::RenderWindow& window, EntityManager& entities) {
+    if (g_lastTree)
+        g_lastTree->draw(window);
+
+    sf::RectangleShape rect;
+    rect.setFillColor(sf::Color::Transparent);
+    rect.setOutlineThickness(1.f);
+    rect.setOutlineColor(sf::Color::Green);
+    for (auto& uptr : entities.getEntities()) {
+        Entity* e = uptr.get();
+        if (!e || !e->isAlive())
+            continue;
+        const sf::FloatRect b = e->getBounds();
+        rect.setPosition(b.position);
+        rect.setSize(b.size);
+        window.draw(rect);
+    }
 }
 
