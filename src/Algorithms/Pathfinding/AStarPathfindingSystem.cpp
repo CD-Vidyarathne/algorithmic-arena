@@ -60,8 +60,9 @@ AStarPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const Til
     lastOpenSet_.clear();
     lastPath_.clear();
 
-    if (!inBounds(map, start) || !inBounds(map, end)) {
-        Logger::get()->warn("A*: start or end out of bounds");
+    start = map.clampTile(start);
+    if (!inBounds(map, end)) {
+        Logger::get()->warn("A*: end tile out of bounds");
         return {};
     }
 

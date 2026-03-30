@@ -119,6 +119,7 @@ Nested loop: for each minion, scan the full `flagTilePositions_` list.
 | Many minions on objectives | Flag scans per minion | `flagTileToIndex_` map |
 | CSV path columns always 0 | Last-frame snapshot + rare `findPath` | Per-second summed metrics after full frame |
 | Multi-second hitches with crowds | Thousands of `findPath` in one frame | `PathfindBudget` + pending paths across frames |
+| A* / Dijkstra “start or end out of bounds” warnings | `worldToTile` can yield invalid start indices at edges | `TileMap::clampTile`; clamp start in `findPath`; warn only if end invalid |
 
 ---
 
@@ -157,6 +158,26 @@ Every `Minion::setTarget` runs a full grid search (`findPath`) on the main threa
 - New orders may spread across many frames instead of one; the game stays responsive.
 
 **Files:** `src/Util/PathfindBudget.h`, `src/Entities/Minion.*`, `src/Game.h`, `src/Game.cpp`.
+
+---
+
+## 7. Log warnings: `A*: start or end out of bounds` (or Dijkstra equivalent)
+
+### Symptom
+
+The logger repeatedly warns that the pathfinding start or end tile is out of bounds, even during normal play (units near map edges, or after converting world position to tile coordinates).
+
+### Root cause
+
+`TileMap::worldToTile` maps world coordinates to tile indices with integer division. A unit whose centre sits on the **right or bottom** edge of the map (for example, world x equal to map width in pixels) maps to tile index **equal to** `width` or `height`, which is **not** a valid tile index (valid range is `0 … width - 1`). Similarly, positions far enough **left or above** the origin can yield **negative** tile indices. Pathfinding correctly rejected those starts, but the warning was noisy and looked like a bug.
+
+### Solution
+
+- Add **`TileMap::clampTile(sf::Vector2i)`** to clamp a tile coordinate into the valid rectangle for the current map dimensions.
+- At the start of **`findPath`** in both A* and Dijkstra, set **`start = map.clampTile(start)`** so searches always begin from an in-bounds tile when the unit is still on or just inside the playable area.
+- Keep validation for **`end`**: if the goal tile is still out of bounds, log a warning (message updated to **end tile** only, since start is now clamped) and return no path.
+
+**Files:** `src/World/TileMap.h`, `src/Algorithms/Pathfinding/AStarPathfindingSystem.cpp`, `src/Algorithms/Pathfinding/DijkstrasPathfindingSystem.cpp`.
 
 ---
 

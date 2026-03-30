@@ -1,5 +1,6 @@
 #pragma once
 #include <SFML/Graphics.hpp>
+#include <algorithm>
 #include <vector>
 
 enum class TileType { Grass, Mud, Tree, Lava, Flag, Deploy };
@@ -38,6 +39,17 @@ class TileMap {
 
     sf::Vector2i worldToTile(sf::Vector2f worldPos) const {
         return {static_cast<int>(worldPos.x / tileSize_), static_cast<int>(worldPos.y / tileSize_)};
+    }
+
+    /** Tile indices from world positions can be negative or equal to width/height at edges; clamp for pathfinding. */
+    sf::Vector2i clampTile(sf::Vector2i tile) const {
+        const int w = static_cast<int>(width_);
+        const int h = static_cast<int>(height_);
+        if (w <= 0 || h <= 0)
+            return {0, 0};
+        tile.x = std::clamp(tile.x, 0, w - 1);
+        tile.y = std::clamp(tile.y, 0, h - 1);
+        return tile;
     }
     sf::Vector2f tileToWorld(sf::Vector2i tilePos) const {
         return {static_cast<float>(tilePos.x * tileSize_),

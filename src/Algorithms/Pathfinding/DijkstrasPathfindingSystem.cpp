@@ -55,8 +55,9 @@ DijkstrasPathfindingSystem::findPath(sf::Vector2i start, sf::Vector2i end, const
     lastOpenSet_.clear();
     lastPath_.clear();
 
-    if (!inBounds(map, start) || !inBounds(map, end)) {
-        Logger::get()->warn("Dijkstra: start or end out of bounds");
+    start = map.clampTile(start);
+    if (!inBounds(map, end)) {
+        Logger::get()->warn("Dijkstra: end tile out of bounds");
         return {};
     }
 
