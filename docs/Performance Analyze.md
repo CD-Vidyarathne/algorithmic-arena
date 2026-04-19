@@ -48,6 +48,14 @@ Use CSV produced by `--csv <path>` during benchmark runs.
 - **Stability spread (FPS):**  
   `max_fps - min_fps` over the steady-state window
 
+### 2.3 Automated analysis (`scripts/analyze_benchmark_csv.py`)
+
+Use the same warmup window as §3 (default **7 s** in the script; override with `--warmup-seconds`).
+
+- **Single run:** `python3 scripts/analyze_benchmark_csv.py analyze <run.csv>` — prints Performance Analyze §2.2 metrics and **absolute band hints** from `Algorithm_Performance_Marking_Scheme.md` (single-run only; pairwise scoring is authoritative).
+- **Pair compare:** `python3 scripts/analyze_benchmark_csv.py compare <a.csv> <b.csv> --labels <NameA> <NameB> --focus collision|pathfinding|both` — prints **relative 0–100% factor scores** (Performance Analyze §6.1), overall average (§6.2), tie-break note (§6.3), and **report template lines** aligned with §8.1–§8.2. Scalability stays at placeholder 50% until you add CSVs across minion levels (§4.1–4.2).
+- **JSON:** add `--json` on either subcommand for machine-readable output (includes `marking` on `compare`).
+
 ---
 
 ## 3. Fair test controls (must hold for all comparisons)
