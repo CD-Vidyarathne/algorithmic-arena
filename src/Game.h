@@ -27,7 +27,7 @@ enum class GameState { Ready, Playing, Won, Lost };
 struct GameOptions {
     std::optional<std::string> benchmarkCsvPath;
     bool uncappedFps = false;
-    std::string mapPath = "../maps/nexus_siege_512.map";
+    std::string mapPath = "../maps/nexus_siege_128.map";
 };
 
 class Game {

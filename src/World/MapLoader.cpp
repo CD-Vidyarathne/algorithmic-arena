@@ -35,7 +35,7 @@ MapData MapLoader::load(const std::string &path) {
 
     std::string line;
     std::vector<std::string> gridLines;
-    gridLines.reserve(512);
+    gridLines.reserve(256);
 
     unsigned int headerWidth = 0;
     unsigned int headerHeight = 0;

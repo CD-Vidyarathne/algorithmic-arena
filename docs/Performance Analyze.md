@@ -70,13 +70,13 @@ To keep scoring valid against `Algorithm_Performance_Marking_Scheme.md`:
 
 Reference maps:
 
-- `maps/benchmark_open_512.map` (collision-focused)
-- `maps/benchmark_maze_512.map` (pathfinding-focused)
-- `maps/nexus_siege_512.map` (integrated narrative check)
+- `maps/benchmark_open_128.map` (collision-focused)
+- `maps/benchmark_maze_128.map` (pathfinding-focused)
+- `maps/nexus_siege_128.map` (integrated narrative check)
 
 ### 4.1 Collision matrix (Quadtree vs Brute-Force)
 
-- **Map:** `benchmark_open_512.map`
+- **Map:** `benchmark_open_128.map`
 - **Pathfinding mode fixed:** keep constant for both runs (recommended A* ON)
 - **Collision build pair:**
   - `USE_QUADTREE_COLLISION=ON`
@@ -93,7 +93,7 @@ Primary outputs for scoring:
 
 ### 4.2 Pathfinding matrix (A* vs Dijkstra)
 
-- **Map:** `benchmark_maze_512.map`
+- **Map:** `benchmark_maze_128.map`
 - **Collision mode fixed:** keep constant for both runs (recommended Quadtree ON)
 - **Pathfinding build pair:**
   - `USE_ASTAR_PATHFINDING=ON`
@@ -112,7 +112,7 @@ Primary outputs for scoring:
 
 ### 4.3 Integrated validation (optional but recommended)
 
-- **Map:** `nexus_siege_512.map`
+- **Map:** `nexus_siege_128.map`
 - Use one fixed minion count and compare pairwise builds to support narrative conclusions.
 - Do not use this as the only evidence for pairwise scoring; it is supporting evidence.
 
@@ -130,7 +130,7 @@ Primary outputs for scoring:
 5. End at fixed duration (60s recommended).
 6. Save CSV with clear naming:
    - `<pair>_<algo>_<map>_<minions>_run<N>.csv`
-   - example: `collision_quadtree_open512_250_run2.csv`
+   - example: `collision_quadtree_open128_250_run2.csv`
 
 ---
 
@@ -215,11 +215,11 @@ Use this four-step structure in report and viva:
 
 ### 8.1 Conclusion template (collision)
 
-"On `benchmark_open_512.map`, Quadtree achieved lower collision time and better FPS stability than Brute-Force as minion count increased, resulting in a higher overall marking score. The scalability trend supports expected spatial partitioning advantages at higher densities."
+"On `benchmark_open_128.map`, Quadtree achieved lower collision time and better FPS stability than Brute-Force as minion count increased, resulting in a higher overall marking score. The scalability trend supports expected spatial partitioning advantages at higher densities."
 
 ### 8.2 Conclusion template (pathfinding)
 
-"On `benchmark_maze_512.map`, A* achieved lower pathfinding cost per call and better frame stability under sustained orders than Dijkstra, producing a higher overall marking score. This aligns with heuristic-guided search reducing unnecessary exploration on weighted maze terrain."
+"On `benchmark_maze_128.map`, A* achieved lower pathfinding cost per call and better frame stability under sustained orders than Dijkstra, producing a higher overall marking score. This aligns with heuristic-guided search reducing unnecessary exploration on weighted maze terrain."
 
 ---
 

@@ -5,10 +5,10 @@ generate_maps.py — Generate Algorithmic Arena .map files.
 Run from the project root:
     python3 scripts/generate_maps.py
 
-Produces:
-    maps/nexus_siege_512.map      Primary gameplay + benchmark map
-    maps/benchmark_open_512.map   Open field for collision stress-test
-    maps/benchmark_maze_512.map   Dense maze for pathfinding stress-test
+Produces (128×128 — small on disk, still valid for CSV metrics; regenerate if you change W/H):
+    maps/nexus_siege_128.map      Primary gameplay + benchmark map
+    maps/benchmark_open_128.map   Open field for collision stress-test
+    maps/benchmark_maze_128.map   Dense maze for pathfinding stress-test
 
 Map symbol legend:
     G  Grass      (passable, speed 1.0x)
@@ -24,10 +24,19 @@ Map symbol legend:
 import os
 import random
 
-W = 512
-H = 512
+# Compact maps for repo size and faster loads; metrics (CSV) still reflect algorithm behaviour.
+W = 128
+H = 128
 DEPLOY_DEPTH = 3   # tile rows/cols reserved as deployment zone on all four sides
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "maps")
+
+# Reference size used to scale obstacle counts when W/H changes (was 512×512).
+REF_WH = 512
+
+
+def entrance_spacing_for(w, h):
+    """Keep several entrances on small maps; wider spacing on large maps."""
+    return max(8, min(w, h) // 8)
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +131,7 @@ def place_commander_start(g, depth):
 
 
 # ---------------------------------------------------------------------------
-# Map 1: nexus_siege_512  — grid-of-rooms maze
+# Map 1: nexus_siege — grid-of-rooms maze
 # ---------------------------------------------------------------------------
 
 def gen_nexus_siege(w, h):
@@ -251,13 +260,13 @@ def gen_nexus_siege(w, h):
             if placed:
                 break
 
-    place_entrances(g, w, h, DEPLOY_DEPTH, entrance_spacing=32)
+    place_entrances(g, w, h, DEPLOY_DEPTH, entrance_spacing=entrance_spacing_for(w, h))
     place_commander_start(g, DEPLOY_DEPTH)
     return g
 
 
 # ---------------------------------------------------------------------------
-# Map 2: benchmark_open_512  — open field, few obstacles
+# Map 2: benchmark_open — open field, few obstacles
 # ---------------------------------------------------------------------------
 
 def gen_benchmark_open(w, h):
@@ -271,27 +280,29 @@ def gen_benchmark_open(w, h):
     interior_x1 = w - DEPLOY_DEPTH - 1
     interior_y1 = h - DEPLOY_DEPTH - 1
 
-    # Sparse Lava pillars (3x3) as obstacles
-    for _ in range(80):
+    # Sparse Lava pillars (3x3) as obstacles — scale count with map area vs 512² reference
+    num_pillars = max(4, (w * h * 80) // (REF_WH * REF_WH))
+    for _ in range(num_pillars):
         px = rng.randint(interior_x0 + 5, interior_x1 - 8)
         py = rng.randint(interior_y0 + 5, interior_y1 - 8)
         for oy in range(3):
             for ox in range(3):
                 g[py + oy][px + ox] = "L"
 
-    # 2 Flag tiles near centre
+    # 2 Flag tiles near centre (offset scales with playable interior)
     mid_x = w // 2
     mid_y = h // 2
-    g[mid_y][mid_x - 20] = "F"
-    g[mid_y][mid_x + 20] = "F"
+    half_span = max(4, (interior_x1 - interior_x0) // 8)
+    g[mid_y][mid_x - half_span] = "F"
+    g[mid_y][mid_x + half_span] = "F"
 
-    place_entrances(g, w, h, DEPLOY_DEPTH, entrance_spacing=48)
+    place_entrances(g, w, h, DEPLOY_DEPTH, entrance_spacing=entrance_spacing_for(w, h))
     place_commander_start(g, DEPLOY_DEPTH)
     return g
 
 
 # ---------------------------------------------------------------------------
-# Map 3: benchmark_maze_512  — dense maze, stress pathfinding
+# Map 3: benchmark_maze — dense maze, stress pathfinding
 # ---------------------------------------------------------------------------
 
 def gen_benchmark_maze(w, h):
@@ -392,7 +403,7 @@ def gen_benchmark_maze(w, h):
             if placed:
                 break
 
-    place_entrances(g, w, h, DEPLOY_DEPTH, entrance_spacing=32)
+    place_entrances(g, w, h, DEPLOY_DEPTH, entrance_spacing=entrance_spacing_for(w, h))
     place_commander_start(g, DEPLOY_DEPTH)
     return g
 
@@ -404,9 +415,9 @@ def gen_benchmark_maze(w, h):
 if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    print("Generating nexus_siege_512.map ...")
+    print("Generating nexus_siege_128.map ...")
     write_map(
-        os.path.join(OUTPUT_DIR, "nexus_siege_512.map"),
+        os.path.join(OUTPUT_DIR, "nexus_siege_128.map"),
         name="Nexus Siege",
         time_limit=180,
         minion_cap=200,
@@ -414,9 +425,9 @@ if __name__ == "__main__":
         grid=gen_nexus_siege(W, H),
     )
 
-    print("Generating benchmark_open_512.map ...")
+    print("Generating benchmark_open_128.map ...")
     write_map(
-        os.path.join(OUTPUT_DIR, "benchmark_open_512.map"),
+        os.path.join(OUTPUT_DIR, "benchmark_open_128.map"),
         name="Open Field Benchmark",
         time_limit=120,
         minion_cap=500,
@@ -424,9 +435,9 @@ if __name__ == "__main__":
         grid=gen_benchmark_open(W, H),
     )
 
-    print("Generating benchmark_maze_512.map ...")
+    print("Generating benchmark_maze_128.map ...")
     write_map(
-        os.path.join(OUTPUT_DIR, "benchmark_maze_512.map"),
+        os.path.join(OUTPUT_DIR, "benchmark_maze_128.map"),
         name="Maze Benchmark",
         time_limit=300,
         minion_cap=100,

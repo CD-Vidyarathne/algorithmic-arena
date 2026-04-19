@@ -1,6 +1,6 @@
 # Maps for Performance Analysis
 
-This document plans **which maps to use or generate** so collision and pathfinding can be **measured, compared, and interpreted** in the report and viva. It aligns with the existing `maps/` assets and the engine’s behaviours (512×512, deploy flags, weighted terrain, `PathfindBudget`, CSV columns).
+This document plans **which maps to use or generate** so collision and pathfinding can be **measured, compared, and interpreted** in the report and viva. It aligns with the existing `maps/` assets and the engine’s behaviours (128×128 committed maps for small repo size, deploy flags, weighted terrain, `PathfindBudget`, CSV columns).
 
 **Related:** [12_marking_scheme.md](12_marking_scheme.md), [7_Implementation_Plan_0302.md](7_Implementation_Plan_0302.md) §9g.
 
@@ -22,9 +22,9 @@ These three are the **minimum** set for a defensible evaluation. They are genera
 
 | Map file | Role | Why it isolates an effect |
 |----------|------|---------------------------|
-| **`benchmark_open_512.map`** | **Collision benchmark** | Large grass interior, few obstacles; **deploy zone** + **2 flags**. Ideal for: spawn many minions, order movement, **high entity density** and **collision-heavy** frames without pathfinding dominating every cell. |
-| **`benchmark_maze_512.map`** | **Pathfinding benchmark** | **Dense tree maze**, **mud** in corridors, **multiple flags** at far corners. **Long paths** and **weighted costs** → Dijkstra explores broadly; A\* should show lower `pathfinding_us_sum_1s` and often fewer expanded nodes (when F2 is enabled for qualitative screenshots only). |
-| **`nexus_siege_512.map`** | **Integrated / narrative** | **Maze + deploy + multiple flags** → representative “full game” load for poster screenshots and discussion of **combined** cost. |
+| **`benchmark_open_128.map`** | **Collision benchmark** | Grass interior, few obstacles; **deploy zone** + **2 flags**. Ideal for: spawn many minions, order movement, **high entity density** and **collision-heavy** frames without pathfinding dominating every cell. |
+| **`benchmark_maze_128.map`** | **Pathfinding benchmark** | **Dense tree maze**, **mud** in corridors, **multiple flags** at far corners. **Weighted costs** → Dijkstra explores broadly; A\* should show lower `pathfinding_us_sum_1s` and often fewer expanded nodes (when F2 is enabled for qualitative screenshots only). |
+| **`nexus_siege_128.map`** | **Integrated / narrative** | **Maze + deploy + multiple flags** → representative “full game” load for poster screenshots and discussion of **combined** cost. |
 
 ---
 
@@ -32,7 +32,7 @@ These three are the **minimum** set for a defensible evaluation. They are genera
 
 ### 3.1 Collision (brute-force vs quadtree)
 
-- **Map:** `benchmark_open_512.map` (primary).
+- **Map:** `benchmark_open_128.map` (primary).
 - **Builds:** `USE_QUADTREE_COLLISION=ON` vs `OFF`; **same** `USE_ASTAR_PATHFINDING` for both (pick one, e.g. ON).
 - **Procedure:**  
   - Cap or uncapped FPS: **document** which (`--unlimited-fps` vs 60 cap).  
@@ -44,7 +44,7 @@ These three are the **minimum** set for a defensible evaluation. They are genera
 
 ### 3.2 Pathfinding (Dijkstra vs A\*)
 
-- **Map:** `benchmark_maze_512.map` (primary).
+- **Map:** `benchmark_maze_128.map` (primary).
 - **Builds:** `USE_ASTAR_PATHFINDING=ON` vs `OFF` (Dijkstra); **same** collision mode for both (e.g. quadtree ON).
 - **Procedure:**  
   - Issue **orders** that trigger many `findPath` calls (e.g. order all to far flags, or use **O** / right-click after bulk spawn).  
@@ -55,19 +55,19 @@ These three are the **minimum** set for a defensible evaluation. They are genera
 
 ### 3.3 Combined story
 
-- **Map:** `nexus_siege_512.map`.
+- **Map:** `nexus_siege_128.map`.
 - **Use:** One **table** or **bar chart** of FPS + collision + path sums at a **fixed** minion count; compare **collision** builds on one row and **pathfinding** builds on another (do not change two variables at once in a single series).
 
 ---
 
 ## 4. Optional extra maps (generate only if needed)
 
-If results are noisy or you need a **smaller** quick iteration:
+If you need **longer paths** or a **clustering choke** not visible on 128×128:
 
 | Suggested name | Size | Purpose |
 |----------------|------|---------|
-| `benchmark_open_128.map` | 128×128 | Fast regeneration; sanity-check scripts; coarse trend only |
-| `benchmark_cluster_512.map` | 512×512 | **Narrow corridor** from deploy to a single interior flag to force **clustering**; amplifies brute vs quadtree gap |
+| Regenerate via `scripts/generate_maps.py` with larger `W`/`H` | e.g. 512×512 | Heavier pathfinding / collision stress; larger `.map` files |
+| `benchmark_cluster_512.map` (if added) | 512×512 | **Narrow corridor** from deploy to a single interior flag to force **clustering**; amplifies brute vs quadtree gap |
 
 **Only add** these if the three canonical maps do not separate the algorithms clearly in your data.
 
@@ -83,7 +83,7 @@ For every benchmark `.map`, keep the **same** `# tile_size=...` as production (e
 
 - [ ] Each **graph** in Chapter 5 names **map file**, **build flags**, **minion count**, and **FPS mode** (capped vs uncapped).
 - [ ] **Collision** comparison uses **open** or **cluster** map; **pathfinding** comparison uses **maze** (or clearly justified alternative).
-- [ ] **Integrated** claim (optional) references `nexus_siege_512.map` or equivalent.
+- [ ] **Integrated** claim (optional) references `nexus_siege_128.map` or equivalent.
 
 ---
 
