@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -28,6 +29,12 @@ struct GameOptions {
     std::optional<std::string> benchmarkCsvPath;
     bool uncappedFps = false;
     std::string mapPath = "../maps/nexus_siege_128.map";
+    bool benchmarkMode = false;
+    float benchmarkDurationSeconds = 60.f;
+    float benchmarkWarmupSeconds = 7.f;
+    int benchmarkTargetMinions = 250;
+    float benchmarkOrderIntervalSeconds = 1.5f;
+    std::uint32_t benchmarkSeed = 1337u;
 };
 
 class Game {
@@ -128,6 +135,16 @@ class Game {
     float scoreTickAccumulator_ = 0.f;
     float initialSpawnGraceSeconds_ = 5.f;
     float captureRatePerMinion_ = 0.55f;
+    std::mt19937 rng_{std::random_device{}()};
+
+    bool benchmarkMode_ = false;
+    bool benchmarkStarted_ = false;
+    float benchmarkDurationSeconds_ = 60.f;
+    float benchmarkWarmupSeconds_ = 7.f;
+    int benchmarkTargetMinions_ = 250;
+    float benchmarkOrderIntervalSeconds_ = 1.5f;
+    float benchmarkElapsedSeconds_ = 0.f;
+    float benchmarkOrderCooldown_ = 0.f;
 
     std::unique_ptr<ICollisionSystem> collisionSystem_;
     std::unique_ptr<IPathfindingSystem> pathfindingSystem_;

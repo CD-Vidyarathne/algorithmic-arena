@@ -24,10 +24,20 @@ Game options (passed to AlgorithmicArena):
   --csv <file>          Benchmark log
   --unlimited-fps       Disable 60 FPS cap
   --map <path>          Map file
+  --benchmark-mode
+  --benchmark-duration-s <seconds>
+  --benchmark-warmup-s <seconds>
+  --benchmark-target-minions <count>
+  --benchmark-order-interval-s <seconds>
+  --benchmark-seed <uint>
 
 Examples:
   ./run.sh --brute --dijkstra
   ./run.sh --quadtree --astar --csv ../results/run1.csv
+  ./run.sh --quadtree --astar --map ../maps/benchmark_open_128.map \
+    --csv ../benchmark_runs/auto.csv --benchmark-mode \
+    --benchmark-duration-s 60 --benchmark-warmup-s 7 \
+    --benchmark-target-minions 500 --benchmark-order-interval-s 1.5
 EOF
       exit 0
       ;;

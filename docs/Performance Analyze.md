@@ -9,6 +9,7 @@ It is intentionally written to be **compatible** with:
 
 - `docs/Algorithm_Performance_Marking_Scheme.md` (primary scoring rubric)
 - `docs/11_maps_for_performance_analysis.md` (map selection and benchmark intent)
+- `docs/Benchmark_Mode.md` (automated execution mode and CLI)
 
 ---
 

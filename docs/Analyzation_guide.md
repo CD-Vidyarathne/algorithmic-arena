@@ -5,6 +5,7 @@ This guide describes **end-to-end** how to collect benchmark data from Algorithm
 - `docs/Performance Analyze.md` — execution and reporting workflow  
 - `docs/Algorithm_Performance_Marking_Scheme.md` — rubric (four factors per algorithm pair)  
 - `docs/11_maps_for_performance_analysis.md` — which maps isolate collision vs pathfinding  
+- `docs/Benchmark_Mode.md` — automated benchmark runs (fixed duration/load)  
 - `scripts/analyze_benchmark_csv.py` — reference implementation (Python 3, standard library only)
 
 ---

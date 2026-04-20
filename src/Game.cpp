@@ -57,6 +57,22 @@ Game::Game(GameOptions options)
         }
     }
 
+    benchmarkMode_ = options.benchmarkMode;
+    benchmarkDurationSeconds_ = std::max(1.f, options.benchmarkDurationSeconds);
+    benchmarkWarmupSeconds_ = std::max(0.f, options.benchmarkWarmupSeconds);
+    benchmarkTargetMinions_ = std::max(1, options.benchmarkTargetMinions);
+    benchmarkOrderIntervalSeconds_ = std::max(0.05f, options.benchmarkOrderIntervalSeconds);
+    rng_.seed(options.benchmarkSeed);
+    if (benchmarkMode_) {
+        showKeymapHud_ = false;
+        debugCollision_ = false;
+        debugPathfinding_ = false;
+        Logger::get()->info(
+            "Benchmark mode enabled: warmup={}s duration={}s target_minions={} order_interval={}s seed={}",
+            benchmarkWarmupSeconds_, benchmarkDurationSeconds_, benchmarkTargetMinions_,
+            benchmarkOrderIntervalSeconds_, options.benchmarkSeed);
+    }
+
 #ifdef USE_QUADTREE_COLLISION
     collisionSystem_ = std::make_unique<QuadtreeCollisionSystem>();
     Logger::get()->info("Collision system: QuadtreeCollisionSystem (USE_QUADTREE_COLLISION)");
@@ -87,6 +103,13 @@ Game::Game(GameOptions options)
 
 void Game::run() {
     while (window_.isOpen()) {
+        if (benchmarkMode_ && !benchmarkStarted_) {
+            startMatch();
+            benchmarkStarted_ = true;
+            benchmarkElapsedSeconds_ = 0.f;
+            benchmarkOrderCooldown_ = 0.f;
+        }
+
         PathfindingPerf::beginFrame();
         float dt = clock_.restart().asSeconds();
         dt = std::min(dt, 0.05f);
@@ -99,6 +122,48 @@ void Game::run() {
         processEvents();
         update(dt);
         render();
+
+        if (benchmarkMode_) {
+            if (gameState_ != GameState::Playing) {
+                Logger::get()->warn("Benchmark mode: state left PLAYING ({}), auto-restarting match",
+                                    static_cast<int>(gameState_));
+                startMatch();
+                benchmarkOrderCooldown_ = 0.f;
+            } else {
+                benchmarkElapsedSeconds_ += dt;
+
+                const bool allFlagsCaptured = (totalFlags_ > 0 && capturedFlags_ >= totalFlags_);
+                const bool noActiveMinions = (hasSpawnedMinion_ && gameTimer_ > initialSpawnGraceSeconds_ &&
+                                              minions_.empty());
+                if (allFlagsCaptured || noActiveMinions) {
+                    Logger::get()->warn(
+                        "Benchmark mode: objective reached (flags_captured={}/{}, minions={}), restarting match",
+                        capturedFlags_, totalFlags_, minions_.size());
+                    startMatch();
+                    benchmarkOrderCooldown_ = 0.f;
+                    continue;
+                }
+
+                const int deficit = benchmarkTargetMinions_ - static_cast<int>(minions_.size());
+                if (deficit > 0) {
+                    spawnMinionsInDeployZone(std::min(deficit, 2000));
+                }
+
+                benchmarkOrderCooldown_ -= dt;
+                if (benchmarkOrderCooldown_ <= 0.f) {
+                    orderMinionsToNearestUncapturedFlag();
+                    benchmarkOrderCooldown_ = benchmarkOrderIntervalSeconds_;
+                }
+
+                const float stopAt = benchmarkWarmupSeconds_ + benchmarkDurationSeconds_;
+                if (benchmarkElapsedSeconds_ >= stopAt) {
+                    Logger::get()->info(
+                        "Benchmark completed automatically at {:.2f}s (warmup {}s + measured {}s)",
+                        benchmarkElapsedSeconds_, benchmarkWarmupSeconds_, benchmarkDurationSeconds_);
+                    window_.close();
+                }
+            }
+        }
 
         if (gameState_ == GameState::Playing && csvLogger_ && csvLogger_->isOpen()) {
             benchCollisionUsAccum_ += static_cast<double>(lastCollisionMs_) * 1000.0;
@@ -607,7 +672,6 @@ void Game::spawnMinionsInDeployZone(int count) {
         return;
     }
 
-    std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<std::size_t> tilePick(0, deployZone_.size() - 1);
     const unsigned int ts = tileMap_->getTileSize();
     const float halfW = 10.f;
@@ -619,10 +683,10 @@ void Game::spawnMinionsInDeployZone(int count) {
     std::uniform_real_distribution<float> jy(-jmax, jmax);
 
     for (int i = 0; i < toSpawn; ++i) {
-        const sf::Vector2i t = deployZone_[tilePick(rng)];
+        const sf::Vector2i t = deployZone_[tilePick(rng_)];
         sf::Vector2f pos = tileMap_->tileCentre(t);
-        pos.x += jx(rng);
-        pos.y += jy(rng);
+        pos.x += jx(rng_);
+        pos.y += jy(rng_);
 
         const float tsf = static_cast<float>(ts);
         const float tileLeft = static_cast<float>(t.x) * tsf;
@@ -811,12 +875,14 @@ void Game::updateGameplay(float dt) {
         }
     }
 
-    if (capturedFlags_ >= totalFlags_ && totalFlags_ > 0) {
-        gameState_ = GameState::Won;
-        return;
-    }
-    if (hasSpawnedMinion_ && gameTimer_ > initialSpawnGraceSeconds_ && minions_.empty()) {
-        gameState_ = GameState::Lost;
+    if (!benchmarkMode_) {
+        if (capturedFlags_ >= totalFlags_ && totalFlags_ > 0) {
+            gameState_ = GameState::Won;
+            return;
+        }
+        if (hasSpawnedMinion_ && gameTimer_ > initialSpawnGraceSeconds_ && minions_.empty()) {
+            gameState_ = GameState::Lost;
+        }
     }
 
     retargetMinionsFromCapturedFlagGoals();
