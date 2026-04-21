@@ -11,17 +11,15 @@ for N in "${LEVELS[@]}"; do
   for R in "${REPEATS[@]}"; do
     TXT="benchmark_results/tables/collision_compare_${N}_run${R}.txt"
     JSON="benchmark_results/json/collision_compare_${N}_run${R}.json"
-    python3 scripts/analyze_benchmark_csv.py compare \
+    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare \
       "benchmark_runs/collision_quadtree_open128_${N}_run${R}.csv" \
       "benchmark_runs/collision_brute_open128_${N}_run${R}.csv" \
-      --labels Quadtree BruteForce --focus collision \
-      --warmup-seconds "${WARMUP}" | tee "$TXT"
+      --labels Quadtree BruteForce --focus collision | tee "$TXT"
 
-    python3 scripts/analyze_benchmark_csv.py compare \
+    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare \
       "benchmark_runs/collision_quadtree_open128_${N}_run${R}.csv" \
       "benchmark_runs/collision_brute_open128_${N}_run${R}.csv" \
-      --labels Quadtree BruteForce --focus collision \
-      --warmup-seconds "${WARMUP}" --json > "$JSON"
+      --labels Quadtree BruteForce --focus collision --json > "$JSON"
   done
 done
 
@@ -29,17 +27,15 @@ for N in "${LEVELS[@]}"; do
   for R in "${REPEATS[@]}"; do
     TXT="benchmark_results/tables/pathfinding_compare_${N}_run${R}.txt"
     JSON="benchmark_results/json/pathfinding_compare_${N}_run${R}.json"
-    python3 scripts/analyze_benchmark_csv.py compare \
+    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare \
       "benchmark_runs/pathfinding_astar_maze128_${N}_run${R}.csv" \
       "benchmark_runs/pathfinding_dijkstra_maze128_${N}_run${R}.csv" \
-      --labels AStar Dijkstra --focus pathfinding \
-      --warmup-seconds "${WARMUP}" | tee "$TXT"
+      --labels AStar Dijkstra --focus pathfinding | tee "$TXT"
 
-    python3 scripts/analyze_benchmark_csv.py compare \
+    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare \
       "benchmark_runs/pathfinding_astar_maze128_${N}_run${R}.csv" \
       "benchmark_runs/pathfinding_dijkstra_maze128_${N}_run${R}.csv" \
-      --labels AStar Dijkstra --focus pathfinding \
-      --warmup-seconds "${WARMUP}" --json > "$JSON"
+      --labels AStar Dijkstra --focus pathfinding --json > "$JSON"
   done
 done
 
