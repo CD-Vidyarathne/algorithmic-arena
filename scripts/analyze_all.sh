@@ -16,10 +16,10 @@ for N in "${LEVELS[@]}"; do
       "benchmark_runs/collision_brute_open128_${N}_run${R}.csv" \
       --labels Quadtree BruteForce --focus collision | tee "$TXT"
 
-    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare \
+    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" --json compare \
       "benchmark_runs/collision_quadtree_open128_${N}_run${R}.csv" \
       "benchmark_runs/collision_brute_open128_${N}_run${R}.csv" \
-      --labels Quadtree BruteForce --focus collision --json > "$JSON"
+      --labels Quadtree BruteForce --focus collision > "$JSON"
   done
 done
 
@@ -32,12 +32,51 @@ for N in "${LEVELS[@]}"; do
       "benchmark_runs/pathfinding_dijkstra_maze128_${N}_run${R}.csv" \
       --labels AStar Dijkstra --focus pathfinding | tee "$TXT"
 
-    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare \
+    python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" --json compare \
       "benchmark_runs/pathfinding_astar_maze128_${N}_run${R}.csv" \
       "benchmark_runs/pathfinding_dijkstra_maze128_${N}_run${R}.csv" \
-      --labels AStar Dijkstra --focus pathfinding --json > "$JSON"
+      --labels AStar Dijkstra --focus pathfinding > "$JSON"
   done
 done
+
+LEVELS_ARGS="${LEVELS[*]}"
+RUNS_ARGS="${REPEATS[*]}"
+
+python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare-matrix \
+  --csv-a-template "benchmark_runs/collision_quadtree_open128_{level}_run{run}.csv" \
+  --csv-b-template "benchmark_runs/collision_brute_open128_{level}_run{run}.csv" \
+  --labels Quadtree BruteForce \
+  --focus collision \
+  --levels ${LEVELS_ARGS} \
+  --runs ${RUNS_ARGS} \
+  | tee benchmark_results/tables/collision_matrix_compare.txt
+
+python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" --json compare-matrix \
+  --csv-a-template "benchmark_runs/collision_quadtree_open128_{level}_run{run}.csv" \
+  --csv-b-template "benchmark_runs/collision_brute_open128_{level}_run{run}.csv" \
+  --labels Quadtree BruteForce \
+  --focus collision \
+  --levels ${LEVELS_ARGS} \
+  --runs ${RUNS_ARGS} \
+  > benchmark_results/json/collision_matrix_compare.json
+
+python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" compare-matrix \
+  --csv-a-template "benchmark_runs/pathfinding_astar_maze128_{level}_run{run}.csv" \
+  --csv-b-template "benchmark_runs/pathfinding_dijkstra_maze128_{level}_run{run}.csv" \
+  --labels AStar Dijkstra \
+  --focus pathfinding \
+  --levels ${LEVELS_ARGS} \
+  --runs ${RUNS_ARGS} \
+  | tee benchmark_results/tables/pathfinding_matrix_compare.txt
+
+python3 scripts/analyze_benchmark_csv.py --warmup-seconds "${WARMUP}" --json compare-matrix \
+  --csv-a-template "benchmark_runs/pathfinding_astar_maze128_{level}_run{run}.csv" \
+  --csv-b-template "benchmark_runs/pathfinding_dijkstra_maze128_{level}_run{run}.csv" \
+  --labels AStar Dijkstra \
+  --focus pathfinding \
+  --levels ${LEVELS_ARGS} \
+  --runs ${RUNS_ARGS} \
+  > benchmark_results/json/pathfinding_matrix_compare.json
 
 python3 - <<'PY'
 import csv
@@ -102,6 +141,14 @@ for p in sorted(glob.glob("benchmark_results/json/*_compare_*_run*.json")):
     gap = abs(m["overall_a"] - m["overall_b"])
     if gap < 5.0:
         print(f"TIE-BREAK NEEDED (<5): {p}  gap={gap:.2f}")
+
+for p in sorted(glob.glob("benchmark_results/json/*_matrix_compare.json")):
+    with open(p, "r", encoding="utf-8") as f:
+        d = json.load(f)
+    for pair_name, m in d.get("marking", {}).items():
+        gap = abs(m["overall_a"] - m["overall_b"])
+        if gap < 5.0:
+            print(f"TIE-BREAK NEEDED (<5): {p} [{pair_name}] gap={gap:.2f}")
 PY
 
 ls benchmark_runs/*.csv > benchmark_results/repro/raw_csv_appendix_list.txt

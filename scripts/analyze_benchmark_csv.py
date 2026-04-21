@@ -210,7 +210,12 @@ SCALABILITY_NOTE = (
 )
 
 
-def compute_collision_pair_scores(a: Summary, b: Summary) -> dict[str, Any]:
+def compute_collision_pair_scores(
+    a: Summary,
+    b: Summary,
+    scalability_override: tuple[float, float] | None = None,
+    scalability_note_override: str | None = None,
+) -> dict[str, Any]:
     """
     Algorithm_Performance_Marking_Scheme.md — Collision pair.
     Speed: mean collision_us_sum_1s (lower better).
@@ -239,7 +244,12 @@ def compute_collision_pair_scores(a: Summary, b: Summary) -> dict[str, Any]:
         sb = float(b.fps_spread) if b.fps_spread is not None else 0.0
         st_a, st_b = stability_scores(a.mean_fps, b.mean_fps, sa, sb)
 
-    sc_a, sc_b = SCALABILITY_PLACEHOLDER, SCALABILITY_PLACEHOLDER
+    if scalability_override is None:
+        sc_a, sc_b = SCALABILITY_PLACEHOLDER, SCALABILITY_PLACEHOLDER
+        scale_note = SCALABILITY_NOTE
+    else:
+        sc_a, sc_b = scalability_override
+        scale_note = scalability_note_override or "Scalability computed from multi-level growth."
     oa = (sp_a + sc_a + cpu_a + st_a) / 4.0
     ob = (sp_b + sc_b + cpu_b + st_b) / 4.0
 
@@ -255,11 +265,16 @@ def compute_collision_pair_scores(a: Summary, b: Summary) -> dict[str, Any]:
         "stability_b": st_b,
         "overall_a": oa,
         "overall_b": ob,
-        "scalability_note": SCALABILITY_NOTE,
+        "scalability_note": scale_note,
     }
 
 
-def compute_pathfinding_pair_scores(a: Summary, b: Summary) -> dict[str, Any]:
+def compute_pathfinding_pair_scores(
+    a: Summary,
+    b: Summary,
+    scalability_override: tuple[float, float] | None = None,
+    scalability_note_override: str | None = None,
+) -> dict[str, Any]:
     """
     Algorithm_Performance_Marking_Scheme.md — Pathfinding pair.
     Speed: mean pathfinding_us_sum_1s (lower better).
@@ -288,7 +303,12 @@ def compute_pathfinding_pair_scores(a: Summary, b: Summary) -> dict[str, Any]:
         sb = float(b.fps_spread) if b.fps_spread is not None else 0.0
         st_a, st_b = stability_scores(a.mean_fps, b.mean_fps, sa, sb)
 
-    sc_a, sc_b = SCALABILITY_PLACEHOLDER, SCALABILITY_PLACEHOLDER
+    if scalability_override is None:
+        sc_a, sc_b = SCALABILITY_PLACEHOLDER, SCALABILITY_PLACEHOLDER
+        scale_note = SCALABILITY_NOTE
+    else:
+        sc_a, sc_b = scalability_override
+        scale_note = scalability_note_override or "Scalability computed from multi-level growth."
     oa = (sp_a + sc_a + cpu_a + st_a) / 4.0
     ob = (sp_b + sc_b + cpu_b + st_b) / 4.0
 
@@ -304,8 +324,67 @@ def compute_pathfinding_pair_scores(a: Summary, b: Summary) -> dict[str, Any]:
         "stability_b": st_b,
         "overall_a": oa,
         "overall_b": ob,
-        "scalability_note": SCALABILITY_NOTE,
+        "scalability_note": scale_note,
     }
+
+
+def average_optional(vals: Sequence[float | None]) -> float | None:
+    good = [v for v in vals if v is not None]
+    if not good:
+        return None
+    return sum(good) / len(good)
+
+
+def summarize_mean(label: str, summaries: Sequence["Summary"], warmup_s: float) -> "Summary":
+    return Summary(
+        file=label,
+        rows_total=sum(s.rows_total for s in summaries),
+        rows_used=sum(s.rows_used for s in summaries),
+        warmup_seconds=warmup_s,
+        time_span_s=average_optional([s.time_span_s for s in summaries]),
+        mean_fps=average_optional([s.mean_fps for s in summaries]),
+        stdev_fps=average_optional([s.stdev_fps for s in summaries]),
+        fps_spread=average_optional([s.fps_spread for s in summaries]),
+        mean_entity_count=average_optional([s.mean_entity_count for s in summaries]),
+        mean_minion_count=average_optional([s.mean_minion_count for s in summaries]),
+        mean_collision_us_sum_1s=average_optional([s.mean_collision_us_sum_1s for s in summaries]),
+        mean_pathfinding_us_sum_1s=average_optional([s.mean_pathfinding_us_sum_1s for s in summaries]),
+        mean_path_calls_sum_1s=average_optional([s.mean_path_calls_sum_1s for s in summaries]),
+        path_us_per_call_agg=average_optional([s.path_us_per_call_agg for s in summaries]),
+        mean_path_us_per_row=average_optional([s.mean_path_us_per_row for s in summaries]),
+        collision_us_per_minion_agg=average_optional([s.collision_us_per_minion_agg for s in summaries]),
+    )
+
+
+def compute_scalability_scores(
+    levels: Sequence[int],
+    metric_a_by_level: dict[int, float],
+    metric_b_by_level: dict[int, float],
+) -> tuple[float, float, str]:
+    if not levels:
+        return 50.0, 50.0, "Scalability placeholder: no levels provided."
+    lo = min(levels)
+    hi = max(levels)
+    if lo not in metric_a_by_level or hi not in metric_a_by_level:
+        return 50.0, 50.0, "Scalability placeholder: missing A low/high level metric."
+    if lo not in metric_b_by_level or hi not in metric_b_by_level:
+        return 50.0, 50.0, "Scalability placeholder: missing B low/high level metric."
+
+    a_lo = metric_a_by_level[lo]
+    a_hi = metric_a_by_level[hi]
+    b_lo = metric_b_by_level[lo]
+    b_hi = metric_b_by_level[hi]
+    if a_lo <= 0 or b_lo <= 0:
+        return 50.0, 50.0, "Scalability placeholder: non-positive low-level baseline."
+
+    growth_a = a_hi / a_lo
+    growth_b = b_hi / b_lo
+    sa, sb = pairwise_scores_lower_is_better(growth_a, growth_b)
+    note = (
+        f"Scalability from growth ratio (level {lo}→{hi}): "
+        f"A={growth_a:.3f}, B={growth_b:.3f} (lower growth is better)."
+    )
+    return sa, sb, note
 
 
 def print_marking_table(
@@ -748,6 +827,104 @@ def cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_compare_matrix(args: argparse.Namespace) -> int:
+    levels = [int(x) for x in args.levels]
+    runs = [int(x) for x in args.runs]
+    la, lb = args.labels[0], args.labels[1]
+
+    all_a: list[Summary] = []
+    all_b: list[Summary] = []
+    collision_metric_a_by_level: dict[int, float] = {}
+    collision_metric_b_by_level: dict[int, float] = {}
+    path_metric_a_by_level: dict[int, float] = {}
+    path_metric_b_by_level: dict[int, float] = {}
+
+    for lvl in levels:
+        per_level_a: list[Summary] = []
+        per_level_b: list[Summary] = []
+        for run in runs:
+            pa = Path(args.csv_a_template.format(level=lvl, run=run))
+            pb = Path(args.csv_b_template.format(level=lvl, run=run))
+            for p in (pa, pb):
+                if not p.is_file():
+                    print(f"Error: file not found: {p}", file=sys.stderr)
+                    return 1
+            sa = summarize(pa, load_rows(pa), args.warmup_seconds)
+            sb = summarize(pb, load_rows(pb), args.warmup_seconds)
+            if sa.rows_used == 0 or sb.rows_used == 0:
+                print(
+                    f"Error: no post-warmup rows for level {lvl} run {run} "
+                    f"({pa} / {pb}).",
+                    file=sys.stderr,
+                )
+                return 1
+            per_level_a.append(sa)
+            per_level_b.append(sb)
+            all_a.append(sa)
+            all_b.append(sb)
+
+        mean_level_a = summarize_mean(f"{la}_level_{lvl}", per_level_a, args.warmup_seconds)
+        mean_level_b = summarize_mean(f"{lb}_level_{lvl}", per_level_b, args.warmup_seconds)
+        if mean_level_a.mean_collision_us_sum_1s is not None and mean_level_b.mean_collision_us_sum_1s is not None:
+            collision_metric_a_by_level[lvl] = mean_level_a.mean_collision_us_sum_1s
+            collision_metric_b_by_level[lvl] = mean_level_b.mean_collision_us_sum_1s
+        if (
+            mean_level_a.mean_pathfinding_us_sum_1s is not None
+            and mean_level_b.mean_pathfinding_us_sum_1s is not None
+        ):
+            path_metric_a_by_level[lvl] = mean_level_a.mean_pathfinding_us_sum_1s
+            path_metric_b_by_level[lvl] = mean_level_b.mean_pathfinding_us_sum_1s
+
+    mean_a = summarize_mean(f"{la}_matrix_mean", all_a, args.warmup_seconds)
+    mean_b = summarize_mean(f"{lb}_matrix_mean", all_b, args.warmup_seconds)
+
+    payload: dict[str, Any] = {
+        "label_a": la,
+        "label_b": lb,
+        "focus": args.focus,
+        "levels": levels,
+        "runs": runs,
+        "summary_a": summary_to_json(mean_a),
+        "summary_b": summary_to_json(mean_b),
+        "marking": {},
+    }
+
+    if args.focus in ("collision", "both"):
+        sc = compute_scalability_scores(levels, collision_metric_a_by_level, collision_metric_b_by_level)
+        payload["marking"]["collision"] = compute_collision_pair_scores(
+            mean_a, mean_b, scalability_override=(sc[0], sc[1]), scalability_note_override=sc[2]
+        )
+    if args.focus in ("pathfinding", "both"):
+        sc = compute_scalability_scores(levels, path_metric_a_by_level, path_metric_b_by_level)
+        payload["marking"]["pathfinding"] = compute_pathfinding_pair_scores(
+            mean_a, mean_b, scalability_override=(sc[0], sc[1]), scalability_note_override=sc[2]
+        )
+
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print()
+        print("=" * 72)
+        print(" MATRIX COMPARISON (multi-level, multi-run)")
+        print("=" * 72)
+        print(f"  A: {la} (template: {args.csv_a_template})")
+        print(f"  B: {lb} (template: {args.csv_b_template})")
+        print(f"  Levels: {levels}")
+        print(f"  Runs:   {runs}")
+        print()
+        if "collision" in payload["marking"]:
+            print_marking_table(
+                la, lb, payload["marking"]["collision"],
+                "MARKING SCHEME — Collision pair (with measured scalability)"
+            )
+        if "pathfinding" in payload["marking"]:
+            print_marking_table(
+                la, lb, payload["marking"]["pathfinding"],
+                "MARKING SCHEME — Pathfinding pair (with measured scalability)"
+            )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="Analyze Algorithmic Arena benchmark CSV files.",
@@ -789,6 +966,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Which OUTCOME block to emphasise (default: both).",
     )
     pc.set_defaults(func=cmd_compare)
+
+    pm = sub.add_parser("compare-matrix", help="Compare algorithm pairs across levels/runs with measured scalability.")
+    pm.add_argument("--csv-a-template", required=True, help="Template with {level} and {run} (e.g. benchmark_runs/collision_quadtree_open128_{level}_run{run}.csv)")
+    pm.add_argument("--csv-b-template", required=True, help="Template with {level} and {run} (e.g. benchmark_runs/collision_brute_open128_{level}_run{run}.csv)")
+    pm.add_argument(
+        "--labels",
+        nargs=2,
+        metavar=("A", "B"),
+        required=True,
+        help="Human names for A and B (e.g. Quadtree BruteForce)",
+    )
+    pm.add_argument(
+        "--focus",
+        choices=("collision", "pathfinding", "both"),
+        default="both",
+        help="Which OUTCOME block to emphasise (default: both).",
+    )
+    pm.add_argument("--levels", nargs="+", default=["50", "100", "250", "500"], help="Load levels to include.")
+    pm.add_argument("--runs", nargs="+", default=["1", "2", "3"], help="Run indices to include.")
+    pm.set_defaults(func=cmd_compare_matrix)
 
     return p
 
