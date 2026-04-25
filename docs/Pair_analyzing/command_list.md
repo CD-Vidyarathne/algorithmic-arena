@@ -3,7 +3,7 @@
 Use this file as the exact command checklist for:
 
 - Collision pair runs (Quadtree vs Brute), multi-level, repeated
-- Pathfinding pair runs (A* vs Dijkstra), multi-level, repeated
+- Pathfinding pair runs (A\* vs Dijkstra), multi-level, repeated
 - Mean/std + trend-ready data exports
 - Raw CSV appendix + reproducibility command log
 
@@ -39,7 +39,7 @@ LEVELS=(50 100 250 500)
 
 ## 1) Collision pair matrix (Quadtree vs Brute, map=open_128)
 
-### 1.1 Run Quadtree (A* fixed)
+### 1.1 Run Quadtree (A\* fixed)
 
 ```bash
 for N in "${LEVELS[@]}"; do
@@ -55,7 +55,7 @@ for N in "${LEVELS[@]}"; do
 done
 ```
 
-### 1.2 Run Brute-Force (A* fixed)
+### 1.2 Run Brute-Force (A\* fixed)
 
 ```bash
 for N in "${LEVELS[@]}"; do
@@ -95,9 +95,9 @@ done
 
 ---
 
-## 2) Pathfinding pair matrix (A* vs Dijkstra, collision=Quadtree fixed)
+## 2) Pathfinding pair matrix (A\* vs Dijkstra, collision=Quadtree fixed)
 
-### 2.1 Run A* (Quadtree fixed)
+### 2.1 Run A\* (Quadtree fixed)
 
 ```bash
 for N in "${LEVELS[@]}"; do
@@ -254,4 +254,3 @@ Record environment info for thesis appendix:
 python3 scripts/analyze_benchmark_csv.py analyze benchmark_runs/collision_quadtree_open128_100_run1.csv --warmup-seconds "${WARMUP}"
 python3 scripts/analyze_benchmark_csv.py analyze benchmark_runs/pathfinding_astar_maze128_100_run1.csv --warmup-seconds "${WARMUP}"
 ```
-

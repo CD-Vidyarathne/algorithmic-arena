@@ -25,17 +25,17 @@ This guide covers **only** the pathfinding comparison. Keep **collision mode ide
 
 `run.sh` maps pathfinding mode to CMake:
 
-| Pathfinding | `./run.sh` flags |
-|-------------|------------------|
-| **A\*** | `--astar` or `--path-astar` (default) |
-| **Dijkstra** | `--dijkstra` or `--path-dijkstra` |
+| Pathfinding  | `./run.sh` flags                      |
+| ------------ | ------------------------------------- |
+| **A\***      | `--astar` or `--path-astar` (default) |
+| **Dijkstra** | `--dijkstra` or `--path-dijkstra`     |
 
 Fix collision so it does not change between the two builds:
 
-| Collision | `./run.sh` flags |
-|-----------|------------------|
-| **Quadtree** (recommended) | `--quadtree` (default) |
-| Brute-Force | `--brute` — **avoid** for this pair unless you intentionally test both dimensions |
+| Collision                  | `./run.sh` flags                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| **Quadtree** (recommended) | `--quadtree` (default)                                                            |
+| Brute-Force                | `--brute` — **avoid** for this pair unless you intentionally test both dimensions |
 
 **Example:** Quadtree + A\*:
 
@@ -133,17 +133,17 @@ The analyser’s scalability column stays at **50/50** until you combine multipl
 
 ## 7. Checklist (fair pathfinding comparison)
 
-- [ ] Same `benchmark_maze_128.map` for both runs  
-- [ ] Same collision side (`--quadtree` on both, unless documented)  
-- [ ] Same `--unlimited-fps` behaviour on both  
-- [ ] Same target minion count and **same order pattern**  
-- [ ] Warmup discarded in analysis (default **7 s**; override with `--warmup-seconds`)  
-- [ ] Several repeats if variance is high  
+- [ ] Same `benchmark_maze_128.map` for both runs
+- [ ] Same collision side (`--quadtree` on both, unless documented)
+- [ ] Same `--unlimited-fps` behaviour on both
+- [ ] Same target minion count and **same order pattern**
+- [ ] Warmup discarded in analysis (default **7 s**; override with `--warmup-seconds`)
+- [ ] Several repeats if variance is high
 
 ---
 
 ## 8. Related docs
 
-- `docs/Performance Analyze.md` — pathfinding matrix and conclusion templates  
-- `docs/Algorithm_Performance_Marking_Scheme.md` — pathfinding factors  
-- `docs/Analyzation_guide.md` — metrics, pseudocode, thesis checklist  
+- `docs/Performance Analyze.md` — pathfinding matrix and conclusion templates
+- `docs/Algorithm_Performance_Marking_Scheme.md` — pathfinding factors
+- `docs/Analyzation_guide.md` — metrics, pseudocode, thesis checklist

@@ -23,17 +23,17 @@ This guide covers **only** the collision-detection comparison. Keep **pathfindin
 
 `run.sh` maps collision mode to CMake:
 
-| Collision algorithm | `./run.sh` flags |
-|---------------------|------------------|
-| **Quadtree** | `--quadtree` or `--collision-quadtree` (default) |
-| **Brute-Force** | `--brute` or `--collision-brute` |
+| Collision algorithm | `./run.sh` flags                                 |
+| ------------------- | ------------------------------------------------ |
+| **Quadtree**        | `--quadtree` or `--collision-quadtree` (default) |
+| **Brute-Force**     | `--brute` or `--collision-brute`                 |
 
 Fix pathfinding so it does not change between the two builds:
 
-| Pathfinding | `./run.sh` flags |
-|-------------|------------------|
-| **A\*** (recommended) | `--astar` or `--path-astar` (default) |
-| Dijkstra | `--dijkstra` — **avoid** for this pair unless you intentionally test both dimensions |
+| Pathfinding           | `./run.sh` flags                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| **A\*** (recommended) | `--astar` or `--path-astar` (default)                                                |
+| Dijkstra              | `--dijkstra` — **avoid** for this pair unless you intentionally test both dimensions |
 
 **Example:** Quadtree + A\* (default stack):
 
@@ -132,17 +132,17 @@ Then summarise trends in your report (tables or graphs).
 
 ## 7. Checklist (fair collision comparison)
 
-- [ ] Same `benchmark_open_128.map` for both runs  
-- [ ] Same pathfinding side (`--astar` on both, unless you document a deliberate change)  
-- [ ] Same `--unlimited-fps` behaviour on both  
-- [ ] Same target minion count and similar gameplay script  
-- [ ] Same approximate run length; discard warmup (default **7 s** in the analyser, adjustable with `--warmup-seconds`)  
-- [ ] At least **three** repeats per condition if you need stable means  
+- [ ] Same `benchmark_open_128.map` for both runs
+- [ ] Same pathfinding side (`--astar` on both, unless you document a deliberate change)
+- [ ] Same `--unlimited-fps` behaviour on both
+- [ ] Same target minion count and similar gameplay script
+- [ ] Same approximate run length; discard warmup (default **7 s** in the analyser, adjustable with `--warmup-seconds`)
+- [ ] At least **three** repeats per condition if you need stable means
 
 ---
 
 ## 8. Related docs
 
-- `docs/Performance Analyze.md` — collision matrix and conclusion templates  
-- `docs/Algorithm_Performance_Marking_Scheme.md` — collision factors (speed, scalability, CPU efficiency, stability)  
-- `docs/Analyzation_guide.md` — full analysis pipeline and pseudocode  
+- `docs/Performance Analyze.md` — collision matrix and conclusion templates
+- `docs/Algorithm_Performance_Marking_Scheme.md` — collision factors (speed, scalability, CPU efficiency, stability)
+- `docs/Analyzation_guide.md` — full analysis pipeline and pseudocode
